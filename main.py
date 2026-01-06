@@ -15,7 +15,7 @@ PEXELS_API_KEY = os.environ["PEXELS_KEY"]
 
 async def generate_content():
     print("1. Generating Script...")
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-pro')
     # You can change the topic here!
     prompt = "Write a shocking fun fact about history or science. Keep it under 25 words. No intro."
     response = model.generate_content(prompt)
