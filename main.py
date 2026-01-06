@@ -4,7 +4,7 @@ import asyncio
 import google.generativeai as genai
 import edge_tts
 import requests
-from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, AudioFileClip
+from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, AudioFileClip, CompositeAudioClip
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -13,46 +13,60 @@ from googleapiclient.http import MediaFileUpload
 genai.configure(api_key=os.environ["GEMINI_KEY"])
 PEXELS_API_KEY = os.environ["PEXELS_KEY"]
 
+# TOPIC WHEEL
+# Format: "Topic Name": "Visual Search Keyword"
+TOPICS = {
+    "Space & Universe": "space stars planets",
+    "Ancient History": "ancient ruins history",
+    "Futuristic Tech": "cyberpunk technology future",
+    "Deep Ocean": "underwater ocean sea",
+    "Psychology Facts": "abstract brain mind",
+    "Scary Stories": "dark spooky forest mist"
+}
+
 async def generate_content():
-    print("1. Finding Available Model...")
+    print("1. Selecting Topic...")
+    # Pick a random topic from our list
+    topic_name, visual_keyword = random.choice(list(TOPICS.items()))
+    print(f"Selected Topic: {topic_name}")
+    
     # SMART MODEL FINDER
-    # This loop asks Google what models are actually available to your key
-    # instead of guessing and crashing.
-    chosen_model = 'gemini-1.5-flash' # Default fallback
+    chosen_model = 'gemini-1.5-flash'
     try:
         for m in genai.list_models():
             if 'generateContent' in m.supported_generation_methods:
                 if 'gemini' in m.name:
                     chosen_model = m.name
-                    print(f"Success! Using model: {chosen_model}")
                     break
-    except Exception as e:
-        print(f"Warning: Could not list models ({e}). Trying default.")
-
+    except:
+        pass
+    
+    print(f"Using Model: {chosen_model}")
     model = genai.GenerativeModel(chosen_model)
     
     print("2. Generating Script...")
-    prompt = "Write a shocking fun fact about history, space, or oceans. Keep it under 25 words. No intro. No hashtags."
+    # We tell the AI the specific topic
+    prompt = f"Write a mind-blowing {topic_name} fact for a viral YouTube Short. Under 25 words. No intro. No emojis."
     
     try:
         response = model.generate_content(prompt)
         script = response.text.strip()
     except Exception as e:
-        # If Gemini fails, we use a backup fact so the bot doesn't crash
-        print(f"AI Error: {e}. Using backup script.")
-        script = "Honey never spoils. Archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old."
+        print(f"AI Error: {e}")
+        script = "The Eiffel Tower can be 15 cm taller during the summer due to thermal expansion."
+        visual_keyword = "Paris city" # Fallback visual
     
     print(f"Script: {script}")
 
     print("3. Generating Voice...")
-    voice = "en-US-ChristopherNeural"
+    # We use a deep storytelling voice
+    voice = "en-US-ChristopherNeural" 
     communicate = edge_tts.Communicate(script, voice)
     await communicate.save("voice.mp3")
 
-    print("4. Finding Video...")
+    print(f"4. Finding Video for '{visual_keyword}'...")
     headers = {"Authorization": PEXELS_API_KEY}
-    query = random.choice(["technology", "ocean", "space", "abstract", "city"])
-    url = f"https://api.pexels.com/videos/search?query={query}&per_page=1&orientation=portrait"
+    url = f"https://api.pexels.com/videos/search?query={visual_keyword}&per_page=1&orientation=portrait"
     
     try:
         r = requests.get(url, headers=headers)
@@ -62,32 +76,61 @@ async def generate_content():
             f.write(requests.get(video_url).content)
     except Exception as e:
         print(f"Pexels Error: {e}")
-        return None
+        return None, None
         
-    return script
+    return script, topic_name
 
-def edit_video(script_text):
+def edit_video(script_text, topic_name):
     print("5. Editing Video...")
     if not script_text: return
     
-    audio = AudioFileClip("voice.mp3")
+    # Load Audio
+    voice_audio = AudioFileClip("voice.mp3")
+    
+    # Load Background Video
     background = VideoFileClip("background.mp4")
     
-    if background.duration < audio.duration:
-        background = background.loop(duration=audio.duration + 0.5)
+    # Loop video if shorter than audio
+    if background.duration < voice_audio.duration:
+        background = background.loop(duration=voice_audio.duration + 0.5)
             
-    background = background.subclip(0, audio.duration).resize(height=1920)
+    background = background.subclip(0, voice_audio.duration).resize(height=1920)
     
-    # Text settings
-    txt_clip = TextClip(script_text, fontsize=70, color='white', font='DejaVu-Sans-Bold', 
-                       size=(800, None), method='caption', stroke_color='black', stroke_width=2)
-    txt_clip = txt_clip.set_pos('center').set_duration(audio.duration)
+    # --- MUSIC LAYER ---
+    try:
+        if os.path.exists("music.mp3"):
+            music = AudioFileClip("music.mp3")
+            # Loop music if needed
+            if music.duration < voice_audio.duration:
+                music = music.loop(duration=voice_audio.duration + 1)
+            
+            # Cut music to match voice length
+            music = music.subclip(0, voice_audio.duration)
+            # Lower volume to 15% so we can hear the voice
+            music = music.volumex(0.15)
+            
+            # Combine Voice + Music
+            final_audio = CompositeAudioClip([voice_audio, music])
+        else:
+            print("No music.mp3 found. using voice only.")
+            final_audio = voice_audio
+    except Exception as e:
+        print(f"Music Error: {e}")
+        final_audio = voice_audio
+
+    # --- TEXT LAYER ---
+    # Yellow text with black border (Stroke) for visibility
+    txt_clip = TextClip(script_text, fontsize=70, color='yellow', font='DejaVu-Sans-Bold', 
+                       size=(850, None), method='caption', 
+                       stroke_color='black', stroke_width=4)
+    txt_clip = txt_clip.set_pos('center').set_duration(voice_audio.duration)
     
-    final = CompositeVideoClip([background, txt_clip]).set_audio(audio)
+    # Combine Everything
+    final = CompositeVideoClip([background, txt_clip]).set_audio(final_audio)
     final.write_videofile("short.mp4", fps=24, codec='libx264', audio_codec='aac')
     print("Video saved as short.mp4")
 
-def upload_to_youtube(title):
+def upload_to_youtube(script_text, topic_name):
     print("6. Uploading to YouTube...")
     creds = Credentials(
         None,
@@ -99,13 +142,18 @@ def upload_to_youtube(title):
     
     youtube = build("youtube", "v3", credentials=creds)
     
+    # Smart Title Generation
+    title = f"{topic_name}: Did you know? 🤯 #shorts"
+    if len(script_text) < 50:
+        title = f"{script_text} #shorts"
+
     request = youtube.videos().insert(
         part="snippet,status",
         body={
             "snippet": {
-                "title": f"{title} #shorts",
-                "description": "Daily Fact #shorts",
-                "tags": ["shorts", "facts", "ai"],
+                "title": title[:100], # YouTube limit is 100 chars
+                "description": f"{script_text}\n\n#facts #learning #{topic_name.split()[0]}",
+                "tags": ["shorts", "facts", topic_name.split()[0]],
                 "categoryId": "22"
             },
             "status": {
@@ -118,7 +166,7 @@ def upload_to_youtube(title):
     print(f"Uploaded! Link: https://youtu.be/{response['id']}")
 
 if __name__ == "__main__":
-    script = asyncio.run(generate_content())
+    script, topic = asyncio.run(generate_content())
     if script:
-        edit_video(script)
-        upload_to_youtube("Daily Fact")
+        edit_video(script, topic)
+        upload_to_youtube(script, topic)
