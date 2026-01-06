@@ -1,9 +1,9 @@
 google-generativeai
 edge-tts
-moviepy==1.0.3
+moviepy
 requests
 google-auth
 google-auth-oauthlib
 google-api-python-client
 imageio-ffmpeg
-imageio==2.4.1
+imageio
