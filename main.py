@@ -50,7 +50,7 @@ async def generate_content():
     await communicate.save("voice.mp3")
 
     print("4. Finding Video...")
-    headers = {"Authorization": Pexels_API_KEY}
+    headers = {"Authorization": PEXELS_API_KEY}
     query = random.choice(["technology", "ocean", "space", "abstract", "city"])
     url = f"https://api.pexels.com/videos/search?query={query}&per_page=1&orientation=portrait"
     
