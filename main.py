@@ -13,8 +13,7 @@ from googleapiclient.http import MediaFileUpload
 genai.configure(api_key=os.environ["GEMINI_KEY"])
 PEXELS_API_KEY = os.environ["PEXELS_KEY"]
 
-# TOPIC WHEEL
-# Format: "Topic Name": "Visual Search Keyword"
+# TOPIC WHEEL (From Old Script)
 TOPICS = {
     "Space & Universe": "space stars planets",
     "Ancient History": "ancient ruins history",
@@ -26,7 +25,6 @@ TOPICS = {
 
 async def generate_content():
     print("1. Selecting Topic...")
-    # Pick a random topic from our list
     topic_name, visual_keyword = random.choice(list(TOPICS.items()))
     print(f"Selected Topic: {topic_name}")
     
@@ -45,8 +43,9 @@ async def generate_content():
     model = genai.GenerativeModel(chosen_model)
     
     print("2. Generating Script...")
-    # We tell the AI the specific topic
-    prompt = f"Write a mind-blowing {topic_name} fact for a viral YouTube Short. Under 25 words. No intro. No emojis."
+    # --- NEW CHANGE: Retention Prompt ---
+    # Forces 3 punchy sentences instead of one block
+    prompt = f"Write a {topic_name} fact in 3 short, punchy sentences. Use simple words a 10-year-old would understand. Start with 'Imagine' or 'Did you know'. Total under 30 words."
     
     try:
         response = model.generate_content(prompt)
@@ -54,12 +53,11 @@ async def generate_content():
     except Exception as e:
         print(f"AI Error: {e}")
         script = "The Eiffel Tower can be 15 cm taller during the summer due to thermal expansion."
-        visual_keyword = "Paris city" # Fallback visual
+        visual_keyword = "Paris city"
     
     print(f"Script: {script}")
 
     print("3. Generating Voice...")
-    # We use a deep storytelling voice
     voice = "en-US-ChristopherNeural" 
     communicate = edge_tts.Communicate(script, voice)
     await communicate.save("voice.mp3")
@@ -96,37 +94,43 @@ def edit_video(script_text, topic_name):
             
     background = background.subclip(0, voice_audio.duration).resize(height=1920)
     
-    # --- MUSIC LAYER ---
+    # --- MUSIC LAYER (From Old Script) ---
+    final_audio = voice_audio
     try:
         if os.path.exists("music.mp3"):
             music = AudioFileClip("music.mp3")
-            # Loop music if needed
             if music.duration < voice_audio.duration:
                 music = music.loop(duration=voice_audio.duration + 1)
-            
-            # Cut music to match voice length
             music = music.subclip(0, voice_audio.duration)
-            # Lower volume to 15% so we can hear the voice
             music = music.volumex(0.15)
-            
-            # Combine Voice + Music
             final_audio = CompositeAudioClip([voice_audio, music])
         else:
             print("No music.mp3 found. using voice only.")
-            final_audio = voice_audio
     except Exception as e:
         print(f"Music Error: {e}")
-        final_audio = voice_audio
 
-    # --- TEXT LAYER ---
-    # Yellow text with black border (Stroke) for visibility
-    txt_clip = TextClip(script_text, fontsize=70, color='yellow', font='DejaVu-Sans-Bold', 
+    # --- NEW CHANGE: Dynamic Text Chunking ---
+    # Instead of one big text block, we split it by sentences
+    sentences = script_text.replace(".", ".|").replace("?", "?|").replace("!", "!|").split("|")
+    sentences = [s.strip() for s in sentences if len(s) > 2]
+    
+    clips = [background]
+    
+    # Calculate how long each sentence stays on screen
+    chunk_duration = voice_audio.duration / len(sentences)
+    current_time = 0
+    
+    for sentence in sentences:
+        txt = TextClip(sentence, fontsize=80, color='yellow', font='DejaVu-Sans-Bold', 
                        size=(850, None), method='caption', 
                        stroke_color='black', stroke_width=4)
-    txt_clip = txt_clip.set_pos('center').set_duration(voice_audio.duration)
+        
+        txt = txt.set_pos('center').set_start(current_time).set_duration(chunk_duration)
+        clips.append(txt)
+        current_time += chunk_duration
     
     # Combine Everything
-    final = CompositeVideoClip([background, txt_clip]).set_audio(final_audio)
+    final = CompositeVideoClip(clips).set_audio(final_audio)
     final.write_videofile("short.mp4", fps=24, codec='libx264', audio_codec='aac')
     print("Video saved as short.mp4")
 
@@ -142,7 +146,7 @@ def upload_to_youtube(script_text, topic_name):
     
     youtube = build("youtube", "v3", credentials=creds)
     
-    # Smart Title Generation
+    # Title Logic (From Old Script)
     title = f"{topic_name}: Did you know? 🤯 #shorts"
     if len(script_text) < 50:
         title = f"{script_text} #shorts"
@@ -151,7 +155,7 @@ def upload_to_youtube(script_text, topic_name):
         part="snippet,status",
         body={
             "snippet": {
-                "title": title[:100], # YouTube limit is 100 chars
+                "title": title[:100],
                 "description": f"{script_text}\n\n#facts #learning #{topic_name.split()[0]}",
                 "tags": ["shorts", "facts", topic_name.split()[0]],
                 "categoryId": "22"
