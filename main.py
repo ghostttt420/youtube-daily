@@ -39,8 +39,7 @@ async def generate_content():
     
     # PROMPT FOR RETENTION (Short sentences)
     print("2. Generating Script...")
-    prompt = f"Write a {topic_name} fact in exactly 3 short sentences. Total under 30 words. No intro."
-    
+    prompt = f"Write a {topic_name} fact in 3 short, punchy sentences. Use simple words a 10-year-old would understand. Start with 'Imagine' or 'Did you know'. Total under 30 words."
     try:
         response = model.generate_content(prompt)
         script = response.text.strip()
