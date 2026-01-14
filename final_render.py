@@ -1,3 +1,8 @@
+import PIL.Image
+# MONKEY PATCH: Fix for MoviePy vs Pillow 10 incompatibility
+if not hasattr(PIL.Image, 'ANTIALIAS'):
+    PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
+
 import os
 import random
 from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, concatenate_videoclips
@@ -31,10 +36,9 @@ def make_video():
         clip = VideoFileClip(path)
         
         # 1. Resize/Crop to 9:16 (if not already)
-        # Assuming Pygame recorded 1080x1920, we just ensure it fits
         if clip.w > 1080: clip = clip.resize(width=1080)
         
-        # 2. Add Overlay Text (e.g., "GENERATION 1")
+        # 2. Add Overlay Text
         gen_num = filename.split('_')[1].split('.')[0]
         
         # Text Logic
@@ -48,18 +52,22 @@ def make_video():
             label = f"Gen {gen_num}: Training..."
             color = 'white'
 
-        txt = TextClip(
-            label, 
-            fontsize=100, 
-            color=color, 
-            font='Impact', 
-            stroke_color='black', 
-            stroke_width=4
-        ).set_position(('center', 200)).set_duration(clip.duration)
-        
-        # Composite
-        comp = CompositeVideoClip([clip, txt])
-        clips.append(comp)
+        try:
+            txt = TextClip(
+                label, 
+                fontsize=100, 
+                color=color, 
+                font='Impact', 
+                stroke_color='black', 
+                stroke_width=4
+            ).set_position(('center', 200)).set_duration(clip.duration)
+            
+            # Composite
+            comp = CompositeVideoClip([clip, txt])
+            clips.append(comp)
+        except Exception as e:
+            print(f"⚠️ TextClip Error (Skipping Text): {e}")
+            clips.append(clip)
 
     # Concatenate all parts
     final = concatenate_videoclips(clips)
