@@ -3,8 +3,9 @@ neat-python
 numpy
 scipy
 moviepy==1.0.3
-imageio
-imageio-ffmpeg
+Pillow==9.5.0
+imageio==2.6.1
+imageio-ffmpeg==0.4.9
 google-auth
 google-auth-oauthlib
 google-api-python-client
