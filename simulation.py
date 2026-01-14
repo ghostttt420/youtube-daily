@@ -2,191 +2,198 @@ import pygame
 import math
 import numpy as np
 from scipy.interpolate import splprep, splev
-import os
 
-# --- CONFIGURATION ---
-WIDTH, HEIGHT = 1080, 1920  # YouTube Shorts Resolution
-CAR_SIZE = 25
-SENSOR_LENGTH = 200
-BG_COLOR = (10, 10, 10)     # Deep Dark Grey (Not pure black, looks better)
-TRACK_COLOR = (40, 40, 40)
-WALL_COLOR = (0, 255, 65)   # Neon Green Walls
-CAR_COLOR = (255, 0, 100)   # Neon Pink Car
+# --- HIGH TIER VISUALS ---
+WIDTH, HEIGHT = 1080, 1920
+WORLD_SIZE = 4000  # The map is 4x bigger than the screen
+CAR_SIZE = 45      # Bigger, detailed cars
+SENSOR_LENGTH = 250
 FPS = 60
 
+# Neon Cyberpunk Palette
+COL_BG = (10, 10, 18)        # Deep Void Blue
+COL_GRID = (30, 30, 50)      # Faint Grid lines
+COL_TRACK = (20, 20, 30)     # Dark Asphalt
+COL_WALL = (0, 255, 255)     # Cyan Neon Borders
+COL_CAR_LEADER = (255, 0, 110) # Hot Pink (Leader)
+COL_CAR_NORM = (50, 100, 255) # Blue (Normal)
+COL_SENSOR = (0, 255, 65)    # Matrix Green
+
+class Camera:
+    def __init__(self, width, height):
+        self.camera = pygame.Rect(0, 0, width, height)
+        self.width = width
+        self.height = height
+
+    def apply(self, entity_rect):
+        """Returns a rect shifted by camera coordinates"""
+        return entity_rect.move(self.camera.topleft)
+
+    def apply_point(self, pos):
+        """Returns a point (x,y) shifted by camera coordinates"""
+        return (pos[0] + self.camera.x, pos[1] + self.camera.y)
+
+    def update(self, target):
+        """Follow the target (Lead Car)"""
+        # Calculate offset to center the target
+        x = -target.rect.centerx + int(WIDTH / 2)
+        y = -target.rect.centery + int(HEIGHT / 2)
+
+        # Clamp camera to world bounds (so we don't see black void edges)
+        x = min(0, max(-(self.width - WIDTH), x))
+        y = min(0, max(-(self.height - HEIGHT), y))
+        
+        self.camera = pygame.Rect(x, y, self.width, self.height)
+
 class Car:
-    def __init__(self, start_pos, angle=0):
+    def __init__(self, start_pos):
         self.x, self.y = start_pos
-        self.angle = angle
+        self.angle = 0
         self.speed = 0
         self.radars = []
         self.alive = True
         self.distance_traveled = 0
+        self.is_leader = False
         
-        # Load/Create Car Image
-        self.original_image = pygame.Surface((CAR_SIZE, CAR_SIZE), pygame.SRCALPHA)
-        # Draw a cool Neon Triangle
-        pygame.draw.polygon(self.original_image, CAR_COLOR, 
-                          [(CAR_SIZE, CAR_SIZE//2), (0, 0), (0, CAR_SIZE)])
-        self.image = self.original_image
+        # Visuals: Trail Buffer
+        self.trail = [] 
+
+        # Base Sprite
+        self.image = pygame.Surface((CAR_SIZE, CAR_SIZE), pygame.SRCALPHA)
         self.rect = self.image.get_rect(center=(self.x, self.y))
+
+    def draw_sprite(self):
+        """Redraws the car sprite (needed if color changes)"""
+        self.image.fill((0,0,0,0))
+        color = COL_CAR_LEADER if self.is_leader else COL_CAR_NORM
+        
+        # 1. Glow Effect (Faint Circle)
+        pygame.draw.circle(self.image, (*color, 50), (CAR_SIZE//2, CAR_SIZE//2), CAR_SIZE//2)
+        # 2. Hard Body (Triangle)
+        pts = [(CAR_SIZE, CAR_SIZE//2), (0, 0), (0, CAR_SIZE)]
+        pygame.draw.polygon(self.image, color, pts)
 
     def update(self, map_mask):
         if not self.alive: return
 
-        # Simple Physics
+        # Physics
         self.x += math.cos(math.radians(360 - self.angle)) * self.speed
         self.y += math.sin(math.radians(360 - self.angle)) * self.speed
         
-        # Collision Detection (Pixel Perfect)
-        # We check if the center of the car touches the "Black" void of the mask
-        try:
-            if map_mask.get_at((int(self.x), int(self.y))) == (0, 0, 0, 255):
-                self.alive = False
-        except IndexError:
-            self.alive = False # Went off screen
-
         self.distance_traveled += self.speed
         self.rect.center = (int(self.x), int(self.y))
+        
+        # Trail Logic (Cyberpunk tail)
+        if self.distance_traveled % 10 == 0:
+            self.trail.append((self.x, self.y))
+            if len(self.trail) > 15: self.trail.pop(0)
+
+        # Collision & Radar
+        self.check_collision(map_mask)
         self.check_radar(map_mask)
 
-    def rotate(self, left=False, right=False):
-        if left: self.angle += 3
-        if right: self.angle -= 3
+    def check_collision(self, map_mask):
+        try:
+            # If center of car hits a wall (Black color on mask)
+            if map_mask.get_at((int(self.x), int(self.y))) == 0:
+                self.alive = False
+        except IndexError:
+            self.alive = False
 
     def check_radar(self, map_mask):
         self.radars.clear()
-        # Cast 5 rays: -90, -45, 0, 45, 90 degrees
         for degree in [-90, -45, 0, 45, 90]:
             self.cast_ray(degree, map_mask)
 
     def cast_ray(self, degree, map_mask):
         length = 0
-        x = int(self.rect.center[0] + math.cos(math.radians(360 - (self.angle + degree))) * length)
-        y = int(self.rect.center[1] + math.sin(math.radians(360 - (self.angle + degree))) * length)
-
-        # Extend ray until it hits a wall or max length
+        x, y = int(self.x), int(self.y)
+        
+        # Raycast loop
         while length < SENSOR_LENGTH:
+            length += 10 # Step size optimization
+            x = int(self.rect.center[0] + math.cos(math.radians(360 - (self.angle + degree))) * length)
+            y = int(self.rect.center[1] + math.sin(math.radians(360 - (self.angle + degree))) * length)
+            
             try:
-                if map_mask.get_at((x, y)) == (0, 0, 0, 255): # Hit Wall (Black)
+                if map_mask.get_at((x, y)) == 0: # Hit Wall
                     break
             except IndexError:
                 break
-                
-            length += 1
-            x = int(self.rect.center[0] + math.cos(math.radians(360 - (self.angle + degree))) * length)
-            y = int(self.rect.center[1] + math.sin(math.radians(360 - (self.angle + degree))) * length)
-
-        # Store (Position, Distance)
+        
         dist = int(math.sqrt(math.pow(x - self.rect.center[0], 2) + math.pow(y - self.rect.center[1], 2)))
         self.radars.append([(x, y), dist])
 
-    def draw(self, screen):
-        # Rotate image
-        rotated_image = pygame.transform.rotate(self.original_image, self.angle)
+    def rotate(self, left=False, right=False):
+        if left: self.angle += 5
+        if right: self.angle -= 5
+
+    def draw(self, screen, camera):
+        # Draw Trail first (so it's under the car)
+        if len(self.trail) > 1 and self.alive:
+            adjusted_trail = [camera.apply_point(p) for p in self.trail]
+            color = COL_CAR_LEADER if self.is_leader else COL_CAR_NORM
+            pygame.draw.lines(screen, color, False, adjusted_trail, 2)
+
+        # Draw Car
+        self.draw_sprite()
+        rotated_image = pygame.transform.rotate(self.image, self.angle)
+        # Fix center offset after rotation
         new_rect = rotated_image.get_rect(center=self.image.get_rect(center=(self.x, self.y)).center)
-        screen.blit(rotated_image, new_rect.topleft)
+        screen.blit(rotated_image, camera.apply(new_rect).topleft)
         
-        # Draw Sensors (The "AI Vision") - Visual Candy
-        for radar in self.radars:
-            position, dist = radar
-            pygame.draw.line(screen, (0, 255, 0, 100), self.rect.center, position, 1)
-            pygame.draw.circle(screen, (0, 255, 0), position, 3)
+        # Draw Sensors (Only for Leader to reduce clutter)
+        if self.is_leader and self.alive:
+            for radar in self.radars:
+                pos, dist = radar
+                pygame.draw.line(screen, (0, 255, 65, 80), camera.apply_point(self.rect.center), camera.apply_point(pos), 1)
+                pygame.draw.circle(screen, (0, 255, 65), camera.apply_point(pos), 3)
 
 class TrackGenerator:
     def __init__(self, seed):
         np.random.seed(seed)
         
-    def generate_track(self, screen):
-        """Generates a random organic loop using Splines"""
-        screen.fill((0, 0, 0)) # Fill Black (Walls)
+    def generate_track(self):
+        # 1. Create a massive surface (World)
+        track_surface = pygame.Surface((WORLD_SIZE, WORLD_SIZE))
+        track_surface.fill((0, 0, 0)) # Walls are 0 (Black)
         
-        # Generate random points in a circle
-        n_points = 8
-        margin = 200
+        # 2. Draw random spline loop
+        n_points = 14
         points = []
         for i in range(n_points):
             angle = (i / n_points) * 2 * math.pi
-            # Randomize radius to make it squiggly
-            radius = np.random.randint(300, 450) 
-            x = WIDTH // 2 + radius * math.cos(angle)
-            y = HEIGHT // 2 + radius * math.sin(angle)
+            radius = np.random.randint(800, 1800) # Huge radius
+            x = WORLD_SIZE // 2 + radius * math.cos(angle)
+            y = WORLD_SIZE // 2 + radius * math.sin(angle)
             points.append((x, y))
+        points.append(points[0]) # Close loop
         
-        # Close the loop
-        points.append(points[0])
-        points = np.array(points)
-
-        # Smooth curve (Spline Interpolation)
-        tck, u = splprep(points.T, u=None, s=0.0, per=1)
-        u_new = np.linspace(u.min(), u.max(), 1000)
+        # Smooth it
+        pts = np.array(points)
+        tck, u = splprep(pts.T, u=None, s=0.0, per=1)
+        u_new = np.linspace(u.min(), u.max(), 2000)
         x_new, y_new = splev(u_new, tck, der=0)
-
-        # Draw the "Drivable" area (White) on Black background
-        track_surface = pygame.Surface((WIDTH, HEIGHT))
-        track_surface.fill((0, 0, 0))
-        
         smooth_points = list(zip(x_new, y_new))
-        # Draw thick line for track
-        pygame.draw.lines(track_surface, (255, 255, 255), True, smooth_points, 180)
-        
-        # Blit track onto screen
-        screen.blit(track_surface, (0, 0))
-        
-        # Return the start position (First point of spline)
-        return (int(x_new[0]), int(y_new[0])), track_surface
 
-# --- TESTER ---
-if __name__ == "__main__":
-    # Setup for Headless (Server) or GUI
-    os.environ["SDL_VIDEODRIVER"] = "dummy" # Remove this line to see it on your PC
-    
-    pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    
-    # 1. Generate Map (Seed 42)
-    generator = TrackGenerator(seed=42)
-    start_pos, track_surface = generator.generate_track(screen)
-    
-    # Create Mask for Collision (White = Safe, Black = Wall)
-    map_mask = pygame.mask.from_surface(track_surface)
-    # Invert mask so Black is solid (collision)
-    map_mask.invert()
+        # 3. Draw The "Drivable" Road (White = Safe)
+        # We draw a wide white line. The AI sees white as safe, black as death.
+        pygame.draw.lines(track_surface, (255, 255, 255), True, smooth_points, 350) 
+        
+        # 4. Generate the "Visual" Map (Pretty colors for the user)
+        visual_surface = pygame.Surface((WORLD_SIZE, WORLD_SIZE))
+        visual_surface.fill(COL_BG)
+        
+        # Draw Grid
+        for x in range(0, WORLD_SIZE, 200):
+            pygame.draw.line(visual_surface, COL_GRID, (x, 0), (x, WORLD_SIZE))
+        for y in range(0, WORLD_SIZE, 200):
+            pygame.draw.line(visual_surface, COL_GRID, (0, y), (WORLD_SIZE, y))
 
-    # 2. Spawn Car
-    car = Car(start_pos)
-    car.speed = 5
-    
-    # 3. Game Loop (Simulation)
-    clock = pygame.time.Clock()
-    for i in range(100): # Run 100 frames
-        screen.fill(BG_COLOR)
-        
-        # Draw Track
-        # We perform a "Color Key" trick: White pixels become Track Color
-        temp_track = track_surface.copy()
-        temp_track.set_colorkey((0, 0, 0)) # Make black transparent
-        
-        # Draw Neon Borders
-        pygame.draw.lines(screen, WALL_COLOR, True, list(zip(*[
-            [int(p[0]) for p in generator.points], # This is pseudo-code for outline
-            # Actually, proper outline requires edge detection, 
-            # for now, we just draw the grey road.
-        ])), 5)
-        
-        # Simple Blit for now
-        pygame.draw.rect(screen, TRACK_COLOR, (0,0,WIDTH,HEIGHT)) # Base
-        screen.blit(track_surface, (0,0)) # This is the white road
+        # Draw Road
+        pygame.draw.lines(visual_surface, COL_TRACK, True, smooth_points, 340)
+        # Draw Neon Edges
+        pygame.draw.lines(visual_surface, COL_WALL, True, smooth_points, 355) # Outer
+        pygame.draw.lines(visual_surface, COL_TRACK, True, smooth_points, 335) # Inner Cut
 
-        # Update Car
-        # AI INPUT WOULD GO HERE (e.g., car.rotate(left=True))
-        car.update(track_surface) # Pass surface for color detection
-        car.draw(screen)
-        
-        pygame.display.flip()
-        clock.tick(FPS)
-        
-        if i % 10 == 0:
-            print(f"Frame {i}: Car at {car.x:.1f}, {car.y:.1f} | Alive: {car.alive}")
-
-    pygame.quit()
+        return (int(x_new[0]), int(y_new[0])), track_surface, visual_surface
