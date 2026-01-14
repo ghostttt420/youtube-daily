@@ -77,7 +77,7 @@ compatibility_threshold = 3.0
 [DefaultStagnation]
 species_fitness_func = max
 max_stagnation       = 20
-species_elapse_time  = 2
+# species_elapse_time  <-- DELETED (This was causing the crash)
 species_elitism      = 2
 
 [DefaultReproduction]
