@@ -43,7 +43,6 @@ async def generate_content():
     model = genai.GenerativeModel(chosen_model)
 
     print("2. Generating Riddle...")
-    # PROMPT: We ask specifically for short, punchy words to help with sync
     prompt = (
         f"Write a hard, short {topic_name}. "
         "Structure: The Riddle (2 short sentences) || The Answer (1-2 words). "
@@ -70,12 +69,9 @@ async def generate_content():
     print(f"Riddle: {riddle}")
     print(f"Answer: {answer}")
 
-    print("3. Synthesizing Voice (Custom Tuned)...")
-    # --- VOICE UPGRADE ---
-    # We use a British voice for "Mystery" vibe
+    print("3. Synthesizing Voice...")
+    # British Voice + Speed Up + Pitch Down = "Mystery Narrator"
     voice = "en-GB-RyanNeural" 
-    
-    # We add rate=+10% (Urgency) and pitch=-5Hz (Darker/Less Robot)
     communicate = edge_tts.Communicate(riddle, voice, rate="+10%", pitch="-5Hz")
     await communicate.save("riddle_voice.mp3")
 
@@ -96,45 +92,53 @@ async def generate_content():
     return riddle, answer, topic_name
 
 def edit_video(riddle_text, answer_text, topic_name):
-    print("5. Compiling Logic Trap (Synced)...")
+    print("5. Compiling Logic Trap (Synced & Polished)...")
     if not riddle_text: return
 
     voice_audio = AudioFileClip("riddle_voice.mp3")
     background = VideoFileClip("background.mp4")
 
+    # Duration: Audio + 2s Pause + 2s Answer
     total_duration = voice_audio.duration + 4.0 
     
+    # Loop background
     if background.duration < total_duration:
         background = background.loop(duration=total_duration)
 
-    background = background.subclip(0, total_duration).resize(height=1920).fx(vfx.colorx, 0.3)
+    # --- VISUAL UPGRADE 1: THE SLOW ZOOM ---
+    # We crop the center and slowly zoom in. 
+    # This prevents the "Static" feel.
+    # Note: Requires MoviePy vfx
+    background = background.subclip(0, total_duration)
+    # Resize to slightly larger than 1080x1920 so we can zoom/crop
+    background = background.resize(height=2000) 
+    # Center crop 1080x1920
+    background = background.crop(x1=0, y1=0, width=1080, height=1920, x_center=background.w/2, y_center=background.h/2)
+    # Apply dark filter
+    background = background.fx(vfx.colorx, 0.3)
 
     clips = [background]
     
-    # --- SYNC FIX ENGINE ---
-    # 1. Clean words to remove punctuation drag
+    # --- SYNC FIX: THE 85% RULE ---
+    # We force text to finish at 85% of the audio duration.
+    # This accounts for silence at the end of the MP3.
+    adjusted_duration = voice_audio.duration * 0.85
     words = riddle_text.split()
-    
-    # 2. "The 95% Rule"
-    # We force the text to finish slightly faster (95% of audio duration)
-    # This prevents the text from lagging behind the voice at the end.
-    adjusted_duration = voice_audio.duration * 0.95
     word_duration = adjusted_duration / len(words)
     
     current_time = 0
     font_choice = 'Impact' if 'Impact' in TextClip.list('font') else 'DejaVu-Sans-Bold'
 
     for word in words:
-        # Aggressive cleaning for visual punch
         clean_word = word.replace(".", "").replace(",", "").replace("?", "").replace("!", "").replace('"', "")
         
         txt = TextClip(
             clean_word.upper(),
-            fontsize=130,       
+            fontsize=140, # BIGGER
             color='white',
             font=font_choice,
             stroke_color='black',
-            stroke_width=4,
+            stroke_width=5,
             size=(1000, None),
             method='caption'
         )
@@ -143,19 +147,19 @@ def edit_video(riddle_text, answer_text, topic_name):
         clips.append(txt)
         current_time += word_duration
 
-    # --- THE "THINKING" PAUSE ---
+    # --- THINKING PAUSE ---
     pause_txt = TextClip(
         "???",
         fontsize=160,
         color='red',
         font=font_choice
-    ).set_pos('center').set_start(voice_audio.duration).set_duration(2.0) # Start exactly when voice ends
+    ).set_pos('center').set_start(voice_audio.duration).set_duration(2.0)
     clips.append(pause_txt)
 
-    # --- THE ANSWER REVEAL ---
+    # --- ANSWER REVEAL ---
     answer_txt = TextClip(
         answer_text.strip().upper(),
-        fontsize=110,
+        fontsize=120,
         color='#00FF41', 
         font=font_choice,
         stroke_color='black',
@@ -165,7 +169,24 @@ def edit_video(riddle_text, answer_text, topic_name):
     ).set_pos('center').set_start(voice_audio.duration + 2.0).set_duration(2.0)
     clips.append(answer_txt)
 
-    final_audio = CompositeAudioClip([voice_audio.set_start(0)])
+    # --- AUDIO UPGRADE: MUSIC MIXING ---
+    final_audio_tracks = [voice_audio.set_start(0)]
+    
+    # Check for music.mp3
+    if os.path.exists("music.mp3"):
+        print("Adding Background Music...")
+        music = AudioFileClip("music.mp3")
+        # Loop music if too short
+        if music.duration < total_duration:
+            music = music.loop(duration=total_duration + 1)
+        
+        # Trim and lower volume (Ambience)
+        music = music.subclip(0, total_duration).volumex(0.3) 
+        final_audio_tracks.append(music)
+    else:
+        print("WARNING: No music.mp3 found. Video will be dry.")
+
+    final_audio = CompositeAudioClip(final_audio_tracks)
     
     final = CompositeVideoClip(clips).set_duration(total_duration).set_audio(final_audio)
     final.write_videofile("logic_trap.mp4", fps=24, codec='libx264', audio_codec='aac')
