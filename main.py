@@ -26,17 +26,14 @@ TOPICS = {
 
 # --- CUSTOM FX: RGB SPLIT (GLITCH) ---
 def rgb_split(image_frame):
-    """Splits RGB channels and offsets them to create a 'Glitch' look"""
-    # Create empty array
+    """Splits RGB channels to create a 'Chromatic Aberration' look"""
     result = np.zeros_like(image_frame)
-    
     # Red Channel (Shift Left)
-    result[:, :-5, 0] = image_frame[:, 5:, 0]
+    result[:, :-6, 0] = image_frame[:, 6:, 0]
     # Green Channel (No Shift)
     result[:, :, 1] = image_frame[:, :, 1]
     # Blue Channel (Shift Right)
-    result[:, 5:, 2] = image_frame[:, :-5, 2]
-    
+    result[:, 6:, 2] = image_frame[:, :-6, 2]
     return result
 
 async def generate_content():
@@ -46,12 +43,12 @@ async def generate_content():
 
     model = genai.GenerativeModel('gemini-1.5-flash')
 
-    # PROMPT: Short & Scary
+    # PROMPT: Explicitly asks for "What am I?" at the end
     prompt = (
-        f"Write a scary, 1-sentence {topic_name}. "
-        "Then provide the answer. "
-        "Format: Riddle || Answer. "
-        "Style: Creepy, Unsettling. "
+        f"Write a short, dark {topic_name}. "
+        "Structure: [Riddle text ending with 'What am I?'] || [The Answer]. "
+        "Example: 'I have cities but no houses. I have mountains but no trees. What am I? || A Map'. "
+        "Style: Mysterious, engaging. No intro text."
     )
 
     try:
@@ -63,22 +60,20 @@ async def generate_content():
             riddle = full_text
             answer = "???"
     except:
-        riddle = "I have no face, but I watch you sleep."
+        riddle = "I have no face, but I watch you sleep. What am I?"
         answer = "A Clock"
 
     print(f"Riddle: {riddle}")
 
-    print("3. Synthesizing Voice (Creepy Child)...")
-    # --- VOICE HACK ---
-    # Using a Child voice (Ana) pitched DOWN sounds demonic/creepy.
-    # Much better than the 'News Anchor' voice.
-    voice = "en-US-AnaNeural" 
-    communicate = edge_tts.Communicate(riddle, voice, rate="-10%", pitch="-15Hz")
+    print("3. Synthesizing Voice (Deep Trailer)...")
+    # --- VOICE FIX ---
+    # Christopher (US Male) pitched DOWN -15Hz sounds like a Movie Trailer narrator.
+    voice = "en-US-ChristopherNeural" 
+    communicate = edge_tts.Communicate(riddle, voice, rate="+5%", pitch="-15Hz")
     await communicate.save("riddle_voice.mp3")
 
     print(f"4. Fetching 3 Visuals for '{visual_keyword}'...")
     headers = {"Authorization": PEXELS_API_KEY}
-    # We fetch 3 clips instead of 1
     url = f"https://api.pexels.com/videos/search?query={visual_keyword}&per_page=3&orientation=portrait"
 
     visual_files = []
@@ -86,7 +81,6 @@ async def generate_content():
         r = requests.get(url, headers=headers)
         videos = r.json()['videos']
         
-        # Download up to 3 videos
         for i, vid in enumerate(videos[:3]):
             video_url = vid['video_files'][0]['link']
             filename = f"clip_{i}.mp4"
@@ -107,50 +101,46 @@ def edit_video(riddle_text, answer_text, visual_files):
     voice_audio = AudioFileClip("riddle_voice.mp3")
     total_duration = voice_audio.duration + 4.0 
 
-    # --- MULTI-SCENE LOGIC ---
-    # We stitch the 3 downloaded clips together to create fast pacing
+    # --- MULTI-SCENE STITCH ---
     clips_list = []
     clip_duration = total_duration / len(visual_files)
     
     for filename in visual_files:
         clip = VideoFileClip(filename).resize(height=1920)
-        # Center crop
         clip = clip.crop(x1=0, y1=0, width=1080, height=1920, x_center=clip.w/2, y_center=clip.h/2)
         
-        # Trim to short segment
         if clip.duration > clip_duration:
             clip = clip.subclip(0, clip_duration)
         else:
             clip = clip.loop(duration=clip_duration)
+        
+        # Add a slight zoom to each clip (dynamic movement)
+        clip = clip.resize(lambda t: 1 + 0.04 * t) 
             
         clips_list.append(clip)
         
-    # Combine the clips
     background = concatenate_videoclips(clips_list)
-    # Ensure exact duration
     background = background.subclip(0, total_duration)
 
-    # --- APPLY "GLITCH" FILTER ---
-    # This applies the RGB Split function to every frame
-    # Note: This is computationally heavy but looks cool.
+    # --- GLITCH FILTER ---
+    # Apply RGB Split + Darken
     background = background.fl_image(rgb_split)
-    
-    # Darken
     background = background.fx(vfx.colorx, 0.4)
 
     clips = [background]
     
-    # --- TEXT ENGINE ---
+    # --- WORD STACKING ---
     words = riddle_text.split()
-    word_duration = (voice_audio.duration * 0.9) / len(words) # 90% speed for safety
+    # 90% speed to ensure text beats the voice slightly
+    word_duration = (voice_audio.duration * 0.9) / len(words) 
     current_time = 0
     font_choice = 'Impact' if 'Impact' in TextClip.list('font') else 'DejaVu-Sans-Bold'
 
     for word in words:
         clean_word = word.replace(".", "").replace(",", "").replace("?", "").replace("!", "")
         
-        # Alternating Colors (White / Red) for "Flash" effect
-        color = 'red' if random.random() > 0.8 else 'white'
+        # "What am I?" gets special RED highlighting
+        color = 'red' if clean_word.lower() in ['what', 'am', 'i', 'who'] else 'white'
         
         txt = TextClip(
             clean_word.upper(),
@@ -163,9 +153,8 @@ def edit_video(riddle_text, answer_text, visual_files):
             method='caption'
         )
         
-        # Shake Effect (Random Position Offset)
-        x_off = random.randint(-10, 10)
-        y_off = random.randint(-10, 10)
+        # Slight jitter for chaos vibe
+        x_off = random.randint(-5, 5)
         
         txt = txt.set_pos(('center', 'center')).set_start(current_time).set_duration(word_duration)
         clips.append(txt)
@@ -210,7 +199,7 @@ def upload_to_youtube(riddle_text, answer_text):
     youtube = build("youtube", "v3", credentials=creds)
 
     title = f"Do NOT Watch At Night 👁️ #shorts #scary"
-    description = f"Answer: || {answer_text} ||\n\n#riddle #horror #creepy"
+    description = f"Can you answer this?\n\nAnswer: || {answer_text} ||\n\n#riddle #horror #creepy"
 
     request = youtube.videos().insert(
         part="snippet,status",
@@ -219,7 +208,7 @@ def upload_to_youtube(riddle_text, answer_text):
                 "title": title[:100],
                 "description": description,
                 "tags": ["shorts", "scary", "horror"],
-                "categoryId": "24" # Entertainment
+                "categoryId": "24"
             },
             "status": { "privacyStatus": "public" }
         },
