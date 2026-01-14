@@ -16,7 +16,6 @@ from googleapiclient.http import MediaFileUpload
 genai.configure(api_key=os.environ["GEMINI_KEY"])
 PEXELS_API_KEY = os.environ["PEXELS_KEY"]
 
-# --- TARGET TOPICS: LOGIC & DARK PSYCHOLOGY ---
 TOPICS = {
     "Dark Riddle": "black smoke ink water abstract dark",
     "Paradox": "abstract geometry dark mystic",
@@ -31,7 +30,6 @@ async def generate_content():
     topic_name, visual_keyword = random.choice(list(TOPICS.items()))
     print(f"Target: {topic_name}")
 
-    # MODEL SELECTION
     chosen_model = 'gemini-1.5-flash'
     try:
         for m in genai.list_models():
@@ -45,24 +43,21 @@ async def generate_content():
     model = genai.GenerativeModel(chosen_model)
 
     print("2. Generating Riddle...")
-    # PROMPT: STRICT FORMAT "Riddle || Answer"
+    # PROMPT: We ask specifically for short, punchy words to help with sync
     prompt = (
         f"Write a hard, short {topic_name}. "
         "Structure: The Riddle (2 short sentences) || The Answer (1-2 words). "
         "Style: Mysterious, Dark, Sherlock Holmes. "
-        "Do not use emojis. Do not use intro text."
+        "Use simple words. Do not use intro text."
     )
 
     try:
         response = model.generate_content(prompt)
         full_text = response.text.strip()
         
-        # Robust Splitting Logic
         if "||" in full_text:
             riddle, answer = full_text.split("||")
         else:
-            # Fallback if AI forgets the separator
-            print("Warning: format issue, using fallback.")
             riddle = full_text
             answer = "Check Comments" 
             
@@ -75,11 +70,13 @@ async def generate_content():
     print(f"Riddle: {riddle}")
     print(f"Answer: {answer}")
 
-    print("3. Synthesizing Voice...")
-    voice = "en-US-ChristopherNeural" 
+    print("3. Synthesizing Voice (Custom Tuned)...")
+    # --- VOICE UPGRADE ---
+    # We use a British voice for "Mystery" vibe
+    voice = "en-GB-RyanNeural" 
     
-    # Generate audio ONLY for the riddle. The answer is silent (visual reveal).
-    communicate = edge_tts.Communicate(riddle, voice)
+    # We add rate=+10% (Urgency) and pitch=-5Hz (Darker/Less Robot)
+    communicate = edge_tts.Communicate(riddle, voice, rate="+10%", pitch="-5Hz")
     await communicate.save("riddle_voice.mp3")
 
     print(f"4. Fetching Visual Context '{visual_keyword}'...")
@@ -94,45 +91,46 @@ async def generate_content():
             f.write(requests.get(video_url).content)
     except Exception as e:
         print(f"Pexels Error: {e}")
-        # Create a dummy file or exit
         return None, None, None
 
     return riddle, answer, topic_name
 
 def edit_video(riddle_text, answer_text, topic_name):
-    print("5. Compiling Logic Trap (Word-by-Word)...")
+    print("5. Compiling Logic Trap (Synced)...")
     if not riddle_text: return
 
     voice_audio = AudioFileClip("riddle_voice.mp3")
     background = VideoFileClip("background.mp4")
 
-    # Duration: Audio + 2s Pause + 2s Answer
     total_duration = voice_audio.duration + 4.0 
     
-    # Loop background to fit total duration
     if background.duration < total_duration:
         background = background.loop(duration=total_duration)
 
-    # Darken background heavily (0.3) so white text pops
     background = background.subclip(0, total_duration).resize(height=1920).fx(vfx.colorx, 0.3)
 
     clips = [background]
     
-    # --- WORD STACKING ENGINE ---
+    # --- SYNC FIX ENGINE ---
+    # 1. Clean words to remove punctuation drag
     words = riddle_text.split()
-    word_duration = voice_audio.duration / len(words)
-    current_time = 0
     
-    # Font Logic: Impact is best for memes/shorts. Fallback to DejaVu.
+    # 2. "The 95% Rule"
+    # We force the text to finish slightly faster (95% of audio duration)
+    # This prevents the text from lagging behind the voice at the end.
+    adjusted_duration = voice_audio.duration * 0.95
+    word_duration = adjusted_duration / len(words)
+    
+    current_time = 0
     font_choice = 'Impact' if 'Impact' in TextClip.list('font') else 'DejaVu-Sans-Bold'
 
     for word in words:
-        # Clean punctuation for a cleaner visual look
+        # Aggressive cleaning for visual punch
         clean_word = word.replace(".", "").replace(",", "").replace("?", "").replace("!", "").replace('"', "")
         
         txt = TextClip(
             clean_word.upper(),
-            fontsize=130,       # HUGE SIZE
+            fontsize=130,       
             color='white',
             font=font_choice,
             stroke_color='black',
@@ -145,30 +143,28 @@ def edit_video(riddle_text, answer_text, topic_name):
         clips.append(txt)
         current_time += word_duration
 
-    # --- THE "THINKING" PAUSE (2 Seconds) ---
+    # --- THE "THINKING" PAUSE ---
     pause_txt = TextClip(
         "???",
         fontsize=160,
         color='red',
         font=font_choice
-    ).set_pos('center').set_start(current_time).set_duration(2.0)
+    ).set_pos('center').set_start(voice_audio.duration).set_duration(2.0) # Start exactly when voice ends
     clips.append(pause_txt)
-    current_time += 2.0
 
-    # --- THE ANSWER REVEAL (2 Seconds) ---
+    # --- THE ANSWER REVEAL ---
     answer_txt = TextClip(
         answer_text.strip().upper(),
         fontsize=110,
-        color='#00FF41', # Green
+        color='#00FF41', 
         font=font_choice,
         stroke_color='black',
         stroke_width=5,
         size=(900, None),
         method='caption'
-    ).set_pos('center').set_start(current_time).set_duration(2.0)
+    ).set_pos('center').set_start(voice_audio.duration + 2.0).set_duration(2.0)
     clips.append(answer_txt)
 
-    # AUDIO MIX
     final_audio = CompositeAudioClip([voice_audio.set_start(0)])
     
     final = CompositeVideoClip(clips).set_duration(total_duration).set_audio(final_audio)
@@ -204,7 +200,7 @@ def upload_to_youtube(riddle_text, answer_text, topic_name):
                 "title": title[:100],
                 "description": description,
                 "tags": ["shorts", "riddle", "puzzle", "logic", "mind games"],
-                "categoryId": "27" # Education
+                "categoryId": "27" 
             },
             "status": {
                 "privacyStatus": "public" 
