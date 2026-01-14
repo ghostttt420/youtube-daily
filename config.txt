@@ -16,7 +16,7 @@ aggregation_default     = sum
 aggregation_mutate_rate = 0.0
 aggregation_options     = sum
 
-# --- Structural Mutation (Strict Mode Fixes) ---
+# --- Structural Mutation ---
 single_structural_mutation = False
 structural_mutation_surer = default
 node_add_prob           = 0.2
@@ -24,7 +24,7 @@ node_delete_prob        = 0.2
 conn_add_prob           = 0.5
 conn_delete_prob        = 0.5
 
-# --- Connection Enable/Disable (The Missing Params) ---
+# --- Connection Enable/Disable ---
 enabled_default         = True
 enabled_mutate_rate     = 0.01
 enabled_rate_to_true_add = 0.0
@@ -78,3 +78,9 @@ compatibility_threshold = 3.0
 species_fitness_func = max
 max_stagnation       = 20
 species_elapse_time  = 2
+species_elitism      = 2
+
+[DefaultReproduction]
+elitism            = 2
+survival_threshold = 0.2
+min_species_size   = 2
