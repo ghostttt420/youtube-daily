@@ -1,6 +1,7 @@
 import os
 import random
 import asyncio
+import datetime
 import numpy as np
 import google.generativeai as genai
 import edge_tts
@@ -17,26 +18,52 @@ from googleapiclient.http import MediaFileUpload
 genai.configure(api_key=os.environ["GEMINI_KEY"])
 PEXELS_API_KEY = os.environ["PEXELS_KEY"]
 
-TOPICS = {
-    "Dark Riddle": "horror abstract scary dark",
-    "Psychology": "optical illusion eye hypnotic",
-    "Paradox": "mirror reflection dark mystery",
-    "Surreal": "liminal space empty hallway fog"
-}
-
-# --- CUSTOM FX: CINEMATIC VIGNETTE (Focus) ---
-def vignette(image, radius=None, opacity=0.5):
-    """Darkens the corners to focus attention on text"""
-    h, w = image.shape[:2]
-    if radius is None:
-        radius = min(h, w)
+# --- TIME-BASED CONTENT ENGINE ---
+def get_dynamic_theme():
+    """Decides content based on the server's current hour"""
+    # GitHub Actions usually runs in UTC. 
+    # 08:00 UTC = 9:00 AM Nigeria (Morning)
+    # 14:00 UTC = 3:00 PM Nigeria (Afternoon)
+    # 20:00 UTC = 9:00 PM Nigeria (Night)
     
-    # Create a mask
+    hour = datetime.datetime.now().hour
+    print(f"⏰ Server Time: {hour}:00")
+    
+    # MORNING (Logic & Brain Teasers)
+    if hour < 12:
+        print("☀️ Mode: ACTIVE BRAIN")
+        return random.choice([
+            ("Logic Puzzle", "abstract geometry white minimal"),
+            ("Lateral Thinking", "chess board dark noir"),
+            ("Impossible Riddle", "maze labyrinth abstract")
+        ])
+        
+    # AFTERNOON (Psychology & Mind Tricks)
+    elif hour < 18:
+        print("🌤️ Mode: MIND BENDING")
+        return random.choice([
+            ("Psychology Trick", "hypnotic spiral optical illusion"),
+            ("Paradox", "mirror reflection infinity"),
+            ("Unsettling Fact", "liminal space empty hallway")
+        ])
+        
+    # NIGHT (Horror & Dark Mystery)
+    else:
+        print("🌑 Mode: NIGHTMARE")
+        return random.choice([
+            ("Two Sentence Horror", "dark forest fog monster"),
+            ("Dark Riddle", "noir rain window night"),
+            ("Glitch Message", "glitch static noise tv horror")
+        ])
+
+# --- CUSTOM FX: VIGNETTE ---
+def vignette(image, radius=None, opacity=0.5):
+    """Darkens corners to focus attention on text"""
+    h, w = image.shape[:2]
+    if radius is None: radius = min(h, w)
     x, y = np.ogrid[:h, :w]
     mask = np.sqrt((x - h/2)**2 + (y - w/2)**2) / (radius / 2)
     mask = 1 - np.clip(mask, 0, 1)
-    
-    # Darken image based on mask
     image = image.astype(float)
     image[:, :, 0] *= (1 - opacity * (1 - mask))
     image[:, :, 1] *= (1 - opacity * (1 - mask))
@@ -44,17 +71,20 @@ def vignette(image, radius=None, opacity=0.5):
     return image.astype(np.uint8)
 
 async def generate_content():
-    print("1. Initiating Cinematic Engine...")
-    topic_name, visual_keyword = random.choice(list(TOPICS.items()))
-    print(f"Target: {topic_name}")
+    print("1. Initiating Content Engine...")
+    theme, visual_keyword = get_dynamic_theme()
+    print(f"Target: {theme}")
 
     model = genai.GenerativeModel('gemini-1.5-flash')
 
+    # PROMPT: Optimized for retention & pacing
     prompt = (
-        f"Write a short, dark {topic_name}. "
-        "Structure: [Riddle text ending with 'What am I?'] || [The Answer]. "
-        "Keep the riddle UNDER 15 words. " # STRICT LIMIT for pacing
-        "Style: Mysterious, engaging. No intro text."
+        f"Write a viral YouTube Short script about: {theme}. "
+        "Format: [Hook/Riddle] || [Answer]. "
+        "Strict Constraints: "
+        "1. Total under 20 words. "
+        "2. Ending MUST be a question (e.g., 'What am I?', 'Who is it?'). "
+        "3. Use simple, punchy words. No emojis."
     )
 
     try:
@@ -64,27 +94,33 @@ async def generate_content():
             riddle, answer = full_text.split("||")
         else:
             riddle = full_text
-            answer = "???"
+            answer = "Check Comments"
     except:
         riddle = "I have no face, but I watch you sleep. What am I?"
         answer = "A Clock"
 
-    print(f"Riddle: {riddle}")
+    print(f"Script: {riddle}")
 
     print("3. Synthesizing Voice...")
-    # Christopher pitched down for authority
-    voice = "en-US-ChristopherNeural" 
-    communicate = edge_tts.Communicate(riddle, voice, rate="+5%", pitch="-10Hz")
+    # Voice Selection Logic
+    if "Horror" in theme or "Dark" in theme:
+        voice = "en-US-ChristopherNeural"
+        pitch = "-15Hz" # Deep Trailer Voice
+    else:
+        voice = "en-GB-RyanNeural"
+        pitch = "-5Hz" # Sherlock Mystery Voice
+    
+    communicate = edge_tts.Communicate(riddle, voice, rate="+5%", pitch=pitch)
     await communicate.save("riddle_voice.mp3")
 
-    print(f"4. Fetching Visuals...")
+    print(f"4. Fetching Visuals for '{visual_keyword}'...")
     headers = {"Authorization": PEXELS_API_KEY}
     url = f"https://api.pexels.com/videos/search?query={visual_keyword}&per_page=3&orientation=portrait"
 
     visual_files = []
     try:
         r = requests.get(url, headers=headers)
-        videos = r.json()['videos']
+        videos = r.json().get('videos', [])
         for i, vid in enumerate(videos[:3]):
             video_url = vid['video_files'][0]['link']
             filename = f"clip_{i}.mp4"
@@ -93,85 +129,83 @@ async def generate_content():
             visual_files.append(filename)
     except Exception as e:
         print(f"Pexels Error: {e}")
-        return None, None, None
+        return None, None, None, None
 
-    return riddle, answer, visual_files
+    return riddle, answer, visual_files, theme
 
-def edit_video(riddle_text, answer_text, visual_files):
-    print("5. Compiling Cinematic Edit...")
+def edit_video(riddle_text, answer_text, visual_files, theme):
+    print("5. Editing Professional Cut...")
     if not riddle_text: return
 
     voice_audio = AudioFileClip("riddle_voice.mp3")
     total_duration = voice_audio.duration + 4.0 
 
-    # --- VISUAL PROCESSING ---
+    # --- VISUAL STITCH & CROP ---
     clips_list = []
-    clip_duration = total_duration / len(visual_files)
+    # If 3 clips, divide duration equally
+    clip_duration = total_duration / max(1, len(visual_files))
     
     for filename in visual_files:
         clip = VideoFileClip(filename)
         
-        # SMART CROP: Force 9:16 Aspect Ratio (1080x1920)
-        # 1. Resize based on height first
+        # FORCE 9:16 (1080x1920)
+        # 1. Resize height to 1920 (or larger)
         if clip.h < 1920:
             clip = clip.resize(height=1920)
         
-        # 2. If width is still too small, resize by width
+        # 2. If width is still < 1080, resize by width
         if clip.w < 1080:
             clip = clip.resize(width=1080)
             
         # 3. Center Crop
         clip = clip.crop(x1=0, y1=0, width=1080, height=1920, x_center=clip.w/2, y_center=clip.h/2)
-        
-        # Loop if too short
+
+        # Loop if needed
         if clip.duration < clip_duration:
             clip = clip.loop(duration=clip_duration)
-        else:
-            clip = clip.subclip(0, clip_duration)
-            
-        # Add Slow Zoom (Ken Burns)
-        clip = clip.resize(lambda t: 1 + 0.03 * t) 
-            
+        
+        clip = clip.subclip(0, clip_duration)
+        
+        # Ken Burns Zoom (Subtle movement)
+        clip = clip.resize(lambda t: 1 + 0.02 * t)
         clips_list.append(clip)
         
     background = concatenate_videoclips(clips_list)
     background = background.subclip(0, total_duration)
 
-    # Apply Vignette (Dark Corners)
+    # Apply Vignette & Color Grade
     background = background.fl_image(vignette)
-    # General Darkening
-    background = background.fx(vfx.colorx, 0.4)
+    background = background.fx(vfx.colorx, 0.4) # Darken for text readability
 
     clips = [background]
     
-    # --- DYNAMIC TEXT ENGINE ---
+    # --- TEXT ENGINE (Safety Margins) ---
     words = riddle_text.split()
-    word_duration = (voice_audio.duration * 0.9) / len(words) 
+    # 95% speed makes text feel "snappy"
+    word_duration = (voice_audio.duration * 0.95) / len(words) 
     current_time = 0
     font_choice = 'Impact' if 'Impact' in TextClip.list('font') else 'DejaVu-Sans-Bold'
 
     for word in words:
         clean_word = word.replace(".", "").replace(",", "").replace("?", "").replace("!", "")
         
-        # --- DYNAMIC SIZING ---
-        # Adjust font size based on word length to prevent cutoff
-        if len(clean_word) <= 4:
-            f_size = 180 # Huge for short words
-        elif len(clean_word) <= 7:
-            f_size = 140 # Normal
-        else:
-            f_size = 100 # Smaller for long words
-            
-        color = 'red' if clean_word.lower() in ['what', 'am', 'i', 'who'] else 'white'
+        # DYNAMIC FONT SIZING
+        base_size = 170
+        if len(clean_word) > 6: base_size = 130
+        if len(clean_word) > 9: base_size = 100
+        
+        # Highlight Keywords
+        is_keyword = clean_word.lower() in ['you', 'dead', 'kill', 'run', 'what', 'who']
+        color = 'red' if is_keyword else 'white'
         
         txt = TextClip(
             clean_word.upper(),
-            fontsize=f_size,       
+            fontsize=base_size,       
             color=color,
             font=font_choice,
             stroke_color='black',
-            stroke_width=6,
-            size=(1080, None), # Constrain width to screen
+            stroke_width=5,
+            size=(1000, None), # Constrain width to safe area
             method='caption'
         )
         
@@ -195,17 +229,17 @@ def edit_video(riddle_text, answer_text, visual_files):
     if os.path.exists("music.mp3"):
         music = AudioFileClip("music.mp3")
         if music.duration < total_duration:
-            music = music.loop(duration=total_duration + 1)
+            music = music.loop(duration=total_duration + 5)
         music = music.subclip(0, total_duration).volumex(0.3) 
         final_audio_tracks.append(music)
 
     final_audio = CompositeAudioClip(final_audio_tracks)
     
     final = CompositeVideoClip(clips).set_duration(total_duration).set_audio(final_audio)
-    final.write_videofile("cinematic_trap.mp4", fps=24, codec='libx264', audio_codec='aac')
-    print("Video saved as cinematic_trap.mp4")
+    final.write_videofile("final_render.mp4", fps=24, codec='libx264', audio_codec='aac')
+    print("Video ready.")
 
-def upload_to_youtube(riddle_text, answer_text):
+def upload_to_youtube(riddle_text, answer_text, theme):
     print("6. Uploading...")
     creds = Credentials(
         None,
@@ -217,8 +251,20 @@ def upload_to_youtube(riddle_text, answer_text):
 
     youtube = build("youtube", "v3", credentials=creds)
 
-    title = f"Do NOT Watch At Night 👁️ #shorts #scary"
-    description = f"Can you answer this?\n\nAnswer: || {answer_text} ||\n\n#riddle #horror #creepy"
+    # Random Title Logic for variety
+    title_options = [
+        f"Only 1% Can Solve This 🧠 #shorts",
+        f"Test Your Logic: {theme} 👁️ #shorts",
+        f"Do NOT Watch At Night ⚠️ #shorts",
+        f"Can You Guess The Answer? #shorts"
+    ]
+    title = random.choice(title_options)
+    
+    description = (
+        f"Can you answer this?\n\n"
+        f"Answer: || {answer_text} ||\n\n"
+        f"#riddle #horror #{theme.replace(' ', '')} #logic"
+    )
 
     request = youtube.videos().insert(
         part="snippet,status",
@@ -226,20 +272,20 @@ def upload_to_youtube(riddle_text, answer_text):
             "snippet": {
                 "title": title[:100],
                 "description": description,
-                "tags": ["shorts", "scary", "horror"],
+                "tags": ["shorts", "scary", "riddle", "logic", "mystery"],
                 "categoryId": "24"
             },
             "status": { "privacyStatus": "public" }
         },
-        media_body=MediaFileUpload("cinematic_trap.mp4")
+        media_body=MediaFileUpload("final_render.mp4")
     )
     response = request.execute()
-    print(f"Done: https://youtu.be/{response['id']}")
+    print(f"Live: https://youtu.be/{response['id']}")
 
 if __name__ == "__main__":
     data = asyncio.run(generate_content())
     if data:
-        riddle, answer, visuals = data
+        riddle, answer, visuals, theme = data
         if riddle:
-            edit_video(riddle, answer, visuals)
-            upload_to_youtube(riddle, answer)
+            edit_video(riddle, answer, visuals, theme)
+            upload_to_youtube(riddle, answer, theme)
