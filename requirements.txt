@@ -9,3 +9,4 @@ imageio==2.6.1
 imageio-ffmpeg==0.4.9
 decorator==4.4.2
 Pillow==9.5.0
+wikipedia-api
