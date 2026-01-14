@@ -49,6 +49,10 @@ response_mutate_power   = 0.0
 response_mutate_rate    = 0.0
 response_replace_rate   = 0.0
 
+# Strict Mode Requirements (New NEAT versions)
+single_structural_mutation = False
+structural_mutation_surer = default
+
 # Compatibility parameters
 compatibility_disjoint_coefficient = 1.0
 compatibility_weight_coefficient   = 0.5
