@@ -13,22 +13,23 @@ from googleapiclient.http import MediaFileUpload
 genai.configure(api_key=os.environ["GEMINI_KEY"])
 PEXELS_API_KEY = os.environ["PEXELS_KEY"]
 
-# TOPIC WHEEL (From Old Script)
+# --- CHANGE 1: THE GHOST PROTOCOL TOPICS ---
+# We focus purely on Data, Privacy, and Security.
 TOPICS = {
-    "Space & Universe": "space stars planets",
-    "Ancient History": "ancient ruins history",
-    "Futuristic Tech": "cyberpunk technology future",
-    "Deep Ocean": "underwater ocean sea",
-    "Psychology Facts": "abstract brain mind",
-    "Scary Stories": "dark spooky forest mist"
+    "Digital Privacy": "matrix code glitch abstract technology",
+    "Cyber Security": "hacker hood server room dark",
+    "Surveillance": "cctv camera eye abstract",
+    "Dark Web": "deep web binary code dark aesthetic",
+    "AI Danger": "artificial intelligence robot red eyes",
+    "Data Leaks": "cyberpunk city rain night"
 }
 
 async def generate_content():
-    print("1. Selecting Topic...")
+    print("1. Initializing Ghost Protocol...")
     topic_name, visual_keyword = random.choice(list(TOPICS.items()))
-    print(f"Selected Topic: {topic_name}")
-    
-    # SMART MODEL FINDER
+    print(f"Target: {topic_name}")
+
+    # MODEL SELECTION (Kept your logic, it's good)
     chosen_model = 'gemini-1.5-flash'
     try:
         for m in genai.list_models():
@@ -39,33 +40,42 @@ async def generate_content():
     except:
         pass
     
-    print(f"Using Model: {chosen_model}")
     model = genai.GenerativeModel(chosen_model)
-    
-    print("2. Generating Script...")
-    # --- NEW CHANGE: Retention Prompt ---
-    # Forces 3 punchy sentences instead of one block
-    prompt = f"Write a {topic_name} fact in 3 short, punchy sentences. Use simple words a 10-year-old would understand. Start with 'Imagine' or 'Did you know'. Total under 30 words."
-    
+
+    print("2. Generating Manifest...")
+    # --- CHANGE 2: THE "HACKER" PROMPT ---
+    # We remove "Did you know". We use "WARNING" or "ALERT".
+    # We ask for a "Terminal Log" style.
+    prompt = (
+        f"Write a dark, urgent fact about {topic_name}. "
+        "Style: Cyber-thriller, Informative, Warning. "
+        "Strictly 3 short sentences. "
+        "Start with words like 'WARNING:', 'ALERT:', or 'SYSTEM FAILURE:'. "
+        "Do not use emojis. Do not use 'Did you know'."
+    )
+
     try:
         response = model.generate_content(prompt)
         script = response.text.strip()
     except Exception as e:
         print(f"AI Error: {e}")
-        script = "The Eiffel Tower can be 15 cm taller during the summer due to thermal expansion."
-        visual_keyword = "Paris city"
-    
-    print(f"Script: {script}")
+        script = "WARNING: Your digital footprint is permanent. Deleting history does not remove the data from the server."
+        visual_keyword = "matrix code"
 
-    print("3. Generating Voice...")
+    print(f"Payload: {script}")
+
+    print("3. Synthesizing Voice...")
+    # Kept Christopher, but you should eventually look for a deeper voice if available.
+    # 'en-US-EricNeural' is often good for serious tones if available, otherwise Christopher is fine.
     voice = "en-US-ChristopherNeural" 
     communicate = edge_tts.Communicate(script, voice)
     await communicate.save("voice.mp3")
 
-    print(f"4. Finding Video for '{visual_keyword}'...")
+    print(f"4. Fetching Visual Context '{visual_keyword}'...")
     headers = {"Authorization": PEXELS_API_KEY}
+    # Added "abstract" and "dark" to ensure we don't get bright, happy videos.
     url = f"https://api.pexels.com/videos/search?query={visual_keyword}&per_page=1&orientation=portrait"
-    
+
     try:
         r = requests.get(url, headers=headers)
         video_data = r.json()
@@ -75,26 +85,24 @@ async def generate_content():
     except Exception as e:
         print(f"Pexels Error: {e}")
         return None, None
-        
+
     return script, topic_name
 
 def edit_video(script_text, topic_name):
-    print("5. Editing Video...")
+    print("5. Compiling Visuals...")
     if not script_text: return
-    
-    # Load Audio
+
     voice_audio = AudioFileClip("voice.mp3")
-    
-    # Load Background Video
     background = VideoFileClip("background.mp4")
-    
-    # Loop video if shorter than audio
+
+    # Loop video logic
     if background.duration < voice_audio.duration:
         background = background.loop(duration=voice_audio.duration + 0.5)
-            
-    background = background.subclip(0, voice_audio.duration).resize(height=1920)
-    
-    # --- MUSIC LAYER (From Old Script) ---
+
+    # Darken the background so the Green text pops
+    background = background.subclip(0, voice_audio.duration).resize(height=1920).fx(lambda c: c.colorx(0.5))
+
+    # Audio Layering
     final_audio = voice_audio
     try:
         if os.path.exists("music.mp3"):
@@ -102,40 +110,43 @@ def edit_video(script_text, topic_name):
             if music.duration < voice_audio.duration:
                 music = music.loop(duration=voice_audio.duration + 1)
             music = music.subclip(0, voice_audio.duration)
-            music = music.volumex(0.15)
+            music = music.volumex(0.20) # Slightly louder for dramatic effect
             final_audio = CompositeAudioClip([voice_audio, music])
-        else:
-            print("No music.mp3 found. using voice only.")
     except Exception as e:
         print(f"Music Error: {e}")
 
-    # --- NEW CHANGE: Dynamic Text Chunking ---
-    # Instead of one big text block, we split it by sentences
+    # --- CHANGE 3: TERMINAL AESTHETIC CAPTIONS ---
     sentences = script_text.replace(".", ".|").replace("?", "?|").replace("!", "!|").split("|")
     sentences = [s.strip() for s in sentences if len(s) > 2]
-    
+
     clips = [background]
-    
-    # Calculate how long each sentence stays on screen
     chunk_duration = voice_audio.duration / len(sentences)
     current_time = 0
-    
+
     for sentence in sentences:
-        txt = TextClip(sentence, fontsize=80, color='yellow', font='DejaVu-Sans-Bold', 
-                       size=(850, None), method='caption', 
-                       stroke_color='black', stroke_width=4)
-        
+        # Changed Font to Courier (Monospace)
+        # Changed Color to Matrix Green (#00FF41)
+        # Added a black background box to the text for readability
+        txt = TextClip(
+            sentence.upper(), # Uppercase looks more like a warning
+            fontsize=65, 
+            color='#00FF41', # HACKER GREEN
+            font='Courier-Bold', # If Courier isn't available, try 'Consolas' or 'DejaVu-Sans-Mono'
+            size=(900, None), 
+            method='caption',
+            bg_color='rgba(0,0,0,0.6)' # Semi-transparent black box behind text
+        )
+
         txt = txt.set_pos('center').set_start(current_time).set_duration(chunk_duration)
         clips.append(txt)
         current_time += chunk_duration
-    
-    # Combine Everything
+
     final = CompositeVideoClip(clips).set_audio(final_audio)
-    final.write_videofile("short.mp4", fps=24, codec='libx264', audio_codec='aac')
-    print("Video saved as short.mp4")
+    final.write_videofile("ghost_protocol.mp4", fps=24, codec='libx264', audio_codec='aac')
+    print("Video saved as ghost_protocol.mp4")
 
 def upload_to_youtube(script_text, topic_name):
-    print("6. Uploading to YouTube...")
+    print("6. Uploading to Network...")
     creds = Credentials(
         None,
         refresh_token=os.environ["YT_REFRESH_TOKEN"],
@@ -143,31 +154,39 @@ def upload_to_youtube(script_text, topic_name):
         client_id=os.environ["YT_CLIENT_ID"],
         client_secret=os.environ["YT_CLIENT_SECRET"]
     )
-    
+
     youtube = build("youtube", "v3", credentials=creds)
+
+    # --- CHANGE 4: CLICK-THROUGH TITLES ---
+    # Titles should trigger curiosity/fear.
+    title = f"WARNING: {topic_name} Exposed ⚠️ #shorts"
     
-    # Title Logic (From Old Script)
-    title = f"{topic_name}: Did you know? 🤯 #shorts"
-    if len(script_text) < 50:
-        title = f"{script_text} #shorts"
+    # Description Logic
+    description = (
+        f"{script_text}\n\n"
+        "🔒 SECURE YOUR DATA:\n"
+        "[Link to Affiliate 1]\n"
+        "[Link to Affiliate 2]\n\n"
+        "#privacy #cybersecurity #darkweb #technology"
+    )
 
     request = youtube.videos().insert(
         part="snippet,status",
         body={
             "snippet": {
                 "title": title[:100],
-                "description": f"{script_text}\n\n#facts #learning #{topic_name.split()[0]}",
-                "tags": ["shorts", "facts", topic_name.split()[0]],
-                "categoryId": "22"
+                "description": description,
+                "tags": ["shorts", "privacy", "cybersecurity", "hacker"],
+                "categoryId": "28" # Changed to 'Science & Technology' (28) from 'People & Blogs' (22)
             },
             "status": {
                 "privacyStatus": "public" 
             }
         },
-        media_body=MediaFileUpload("short.mp4")
+        media_body=MediaFileUpload("ghost_protocol.mp4")
     )
     response = request.execute()
-    print(f"Uploaded! Link: https://youtu.be/{response['id']}")
+    print(f"Transmission Complete: https://youtu.be/{response['id']}")
 
 if __name__ == "__main__":
     script, topic = asyncio.run(generate_content())
