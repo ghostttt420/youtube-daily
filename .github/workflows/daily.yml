@@ -17,6 +17,8 @@ jobs:
       YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
       YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+      # MoviePy ImageMagick configuration (sometimes needed on Linux)
+      IMAGEMAGICK_BINARY: /usr/bin/convert
 
     steps:
       - name: Checkout Code
@@ -28,25 +30,28 @@ jobs:
           python-version: '3.10'
 
       - name: Install System Dependencies
-        # MoviePy and Pygame need these system libraries
+        # Added imagemagick here (Required for TextClip)
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg libsdl2-dev
+          sudo apt-get install -y ffmpeg libsdl2-dev imagemagick
+
+      - name: Fix ImageMagick Policy
+        # On Linux, ImageMagick disables PDF/Text by default for security. We must unblock it.
+        run: |
+          sudo sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml
 
       - name: Install Python Libraries
         run: |
-          pip install pygame neat-python moviepy imageio imageio-ffmpeg google-auth google-auth-oauthlib google-api-python-client numpy scipy
+          pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Run Simulation & Training
-        # This runs the AI, generates the clips, and saves them to 'training_clips/'
         run: python ai_brain.py
 
       - name: Edit & Upload Video
-        # This stitches the clips and uploads to YouTube
         run: python final_render.py
 
       - name: Upload Video Artifact
-        # Saves the video to GitHub Actions tab so you can download and watch it
         if: always()
         uses: actions/upload-artifact@v4
         with:
