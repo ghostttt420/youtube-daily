@@ -3,7 +3,7 @@ import neat
 import os
 import sys
 import pickle
-import simulation  # Uses the new V2 simulation
+import simulation  # Uses the High-Effort V2 simulation
 import imageio
 
 # --- CONFIG ---
@@ -26,15 +26,14 @@ def run_simulation(genomes, config):
 
     # Headless setup
     pygame.init()
+    # Fixed the WIDTH/HEIGHT reference to match simulation.py
     screen = pygame.display.set_mode((simulation.WIDTH, simulation.HEIGHT))
     
     # 1. Generate Massive Map
-    track_seed = 42 + GENERATION # Change map slightly or keep consistent
-    map_gen = simulation.TrackGenerator(seed=101) # Keep seed fixed so we see improvement on SAME track
+    map_gen = simulation.TrackGenerator(seed=101) # Keep seed fixed for consistency
     start_pos, collision_map, visual_map = map_gen.generate_track()
     
-    # Collision Mask (Black = Wall)
-    # We use the raw black/white surface for collision logic
+    # Collision Mask
     map_mask = pygame.mask.from_surface(collision_map)
 
     # 2. Camera Setup
@@ -51,46 +50,51 @@ def run_simulation(genomes, config):
     # Recorder
     writer = None
     if GENERATION in RECORD_GENS:
+        print(f"🎥 Recording Generation {GENERATION}...")
         save_path = os.path.join(VIDEO_OUTPUT_DIR, f"gen_{GENERATION}.mp4")
         writer = imageio.get_writer(save_path, fps=30)
 
     # 4. Race Loop
     running = True
     frame_count = 0
+    # Increased frame limit to allow cars to finish the huge track
+    max_frames = 2000 if GENERATION > 10 else 1000
     
-    while running and len(cars) > 0 and frame_count < 1000:
+    while running and len(cars) > 0 and frame_count < max_frames:
         frame_count += 1
         
-        # --- A. FIND LEADER ---
-        # Find the car that has traveled the furthest to focus camera on it
+        # --- A. FIND LEADER & UPDATE CAMERA ---
+        # Find car with max distance
         leader = max(cars, key=lambda c: c.distance_traveled)
-        for c in cars: c.is_leader = False
+        for c in cars:
+            c.is_leader = False
         leader.is_leader = True
         
-        # Update Camera to follow Leader
         camera.update(leader)
 
-        # --- B. AI LOGIC ---
+        # --- B. AI LOGIC & PHYSICS ---
         for i, car in enumerate(cars):
-            ge[i].fitness += 0.1
+            ge[i].fitness += 0.1 # Survive reward
             if not car.alive: continue
 
-            # Check Radar (Pass the collision map)
+            # PASS THE ACTUAL MASK for radar
             car.check_radar(map_mask)
             
-            inputs = [d[1] / 300.0 for d in car.radars] # Normalize
+            # Normalize inputs based on SENSOR_LENGTH
+            inputs = [d[1] / float(simulation.SENSOR_LENGTH) for d in car.radars] 
             output = nets[i].activate(inputs)
             
+            # Decisions
             if output[0] > 0.5: car.rotate(right=True)
             if output[0] < -0.5: car.rotate(left=True)
             
-            car.speed = 12 # Higher speed for excitement
+            car.speed = 12 # Speed boost
             car.update(map_mask)
 
-        # --- C. DEATH CHECK ---
+        # --- C. CLEANUP DEAD CARS ---
         for i in range(len(cars) - 1, -1, -1):
             if not cars[i].alive:
-                ge[i].fitness -= 1
+                ge[i].fitness -= 2.0 # Heavy crash penalty
                 cars.pop(i)
                 nets.pop(i)
                 ge.pop(i)
@@ -101,14 +105,13 @@ def run_simulation(genomes, config):
         screen.fill(simulation.COL_BG)
         
         # 1. Draw Map (Shifted by Camera)
-        offset_pos = (camera.camera.x, camera.camera.y)
-        screen.blit(visual_map, offset_pos)
+        screen.blit(visual_map, (camera.camera.x, camera.camera.y))
         
         # 2. Draw Cars
         for car in cars:
             car.draw(screen, camera)
 
-        # 3. HUD
+        # 3. HUD (Only draw if recording to save time)
         if writer:
             font = pygame.font.SysFont("Impact", 60)
             status = f"GEN {GENERATION} | ALIVE: {len(cars)}"
@@ -117,21 +120,25 @@ def run_simulation(genomes, config):
 
         pygame.display.flip()
 
-        # --- E. RECORD ---
+        # --- E. RECORD FRAME ---
         if writer:
             try:
                 frame = pygame.surfarray.array3d(screen)
                 frame = frame.swapaxes(0, 1)
                 writer.append_data(frame)
-            except: pass
+            except Exception as e:
+                print(f"Record Error: {e}")
 
-    if writer: writer.close()
+    if writer:
+        writer.close()
+        print(f"✅ Gen {GENERATION} saved.")
 
 def run_neat(config_path):
     config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
                                 neat.DefaultSpeciesSet, neat.DefaultStagnation,
                                 config_path)
     p = neat.Population(config)
+    p.add_reporter(neat.StdOutReporter(True))
     p.run(run_simulation, MAX_GENERATIONS)
 
 if __name__ == "__main__":
