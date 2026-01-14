@@ -2,7 +2,7 @@ pygame
 neat-python
 numpy
 scipy
-moviepy
+moviepy==1.0.3
 imageio
 imageio-ffmpeg
 google-auth
