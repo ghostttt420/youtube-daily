@@ -1,0 +1,37 @@
+{
+    "theme_key": "DESERT",
+    "map_seed": 203136,
+    "physics": {
+        "friction": 0.96
+    },
+    "visuals": {
+        "bg": [
+            180,
+            80,
+            40
+        ],
+        "road": [
+            210,
+            150,
+            100
+        ],
+        "wall": [
+            100,
+            50,
+            20
+        ],
+        "center": [
+            180,
+            120,
+            80
+        ]
+    },
+    "meta": {
+        "title": "AI Rallies on MARS \ud83d\ude80 (Gen {gen})",
+        "tags": [
+            "rally",
+            "offroad",
+            "mars"
+        ]
+    }
+}
