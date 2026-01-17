@@ -5,186 +5,203 @@ import sys
 import pickle
 import imageio
 import numpy as np
-import simulation  # Imports your physics/camera classes
+import simulation  # Imports your physics engine
+from moviepy.editor import VideoFileClip, AudioFileClip
 
 # --- CONFIG ---
 GENERATION = 0
 MAX_GENERATIONS = 50
-RECORD_GENS = [1, 5, 10, 20, 30, 49] # Gens to save video for
+RECORD_GENS = [1, 5, 10, 20, 30, 49] # Gens to save
 VIDEO_OUTPUT_DIR = "training_clips"
+FINAL_OUTPUT_DIR = "ready_to_upload"
 
-# Ensure output folder exists
-if not os.path.exists(VIDEO_OUTPUT_DIR):
-    os.makedirs(VIDEO_OUTPUT_DIR)
+# STRICT SHORTS LIMITS
+FPS = 30 
+MAX_VIDEO_DURATION = 58 # Seconds (Keep under 60!)
+MAX_FRAMES = FPS * MAX_VIDEO_DURATION
+
+if not os.path.exists(VIDEO_OUTPUT_DIR): os.makedirs(VIDEO_OUTPUT_DIR)
+if not os.path.exists(FINAL_OUTPUT_DIR): os.makedirs(FINAL_OUTPUT_DIR)
+
+def add_sound_and_export(video_path, gen_num):
+    """Post-production: Adds music to the silent game clip"""
+    print(f"🎵 Processing Sound for Gen {gen_num}...")
+    output_path = os.path.join(FINAL_OUTPUT_DIR, f"FactGhost_Gen_{gen_num}.mp4")
+    
+    try:
+        # Load Video
+        clip = VideoFileClip(video_path)
+        
+        # Load Music
+        if os.path.exists("music.mp3"):
+            audio = AudioFileClip("music.mp3")
+            
+            # Loop audio if video is longer, or subclip if shorter
+            if audio.duration < clip.duration:
+                audio = audio.loop(duration=clip.duration)
+            else:
+                audio = audio.subclip(0, clip.duration)
+                
+            # Composite
+            clip = clip.set_audio(audio)
+        else:
+            print("⚠️ Warning: 'music.mp3' not found. Video will be silent.")
+
+        # Write
+        clip.write_videofile(output_path, codec='libx264', audio_codec='aac', logger=None)
+        print(f"🚀 SUCCESS: {output_path} is ready for upload!")
+        
+    except Exception as e:
+        print(f"❌ Video Processing Error: {e}")
 
 def run_simulation(genomes, config):
     global GENERATION
     GENERATION += 1
-    print(f"\n--- 🏁 Starting Generation {GENERATION} ---")
+    print(f"\n--- 🏁 Gen {GENERATION} Start ---")
 
     nets = []
     cars = []
     ge = []
 
-    # 1. Setup Pygame & Map
+    # Setup Environment
     pygame.init()
-    # Note: We use the constants from simulation.py to ensure they match
     screen = pygame.display.set_mode((simulation.WIDTH, simulation.HEIGHT))
-    clock = pygame.time.Clock()
-
-    # Generate the Map (Seed fixed so AI learns the same track)
+    
+    # Generate Map (Fixed Seed = Fair Comparison)
     map_gen = simulation.TrackGenerator(seed=42)
     start_pos, track_surface, visual_map = map_gen.generate_track()
-    
-    # Create Collision Mask (White pixels = Road)
     map_mask = pygame.mask.from_surface(track_surface)
 
-    # Setup Camera
     camera = simulation.Camera(simulation.WORLD_SIZE, simulation.WORLD_SIZE)
 
-    # 2. Spawn Cars & Networks
+    # Spawn AI
     for _, g in genomes:
         net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
-        
-        # Create Car
-        car = simulation.Car(start_pos)
-        cars.append(car)
-        
-        # Init Fitness
+        cars.append(simulation.Car(start_pos)) # New Physics Car
         g.fitness = 0
         ge.append(g)
 
-    # 3. Setup Video Recorder
+    # Video Recording Setup
     writer = None
-    if GENERATION in RECORD_GENS:
-        print(f"🎥 RECORDING ENABLED for Gen {GENERATION}")
-        save_path = os.path.join(VIDEO_OUTPUT_DIR, f"gen_{GENERATION}.mp4")
-        writer = imageio.get_writer(save_path, fps=30) # 30 FPS for smooth Shorts
+    temp_video_path = os.path.join(VIDEO_OUTPUT_DIR, f"temp_gen_{GENERATION}.mp4")
+    recording = (GENERATION in RECORD_GENS)
+    
+    if recording:
+        print("🎥 Recording started...")
+        writer = imageio.get_writer(temp_video_path, fps=FPS)
 
-    # --- THE RACE LOOP ---
+    # Race Loop
     running = True
     frame_count = 0
-    # Allow longer races as they get smarter
-    max_frames = 1000 + (GENERATION * 50) 
     
-    # Pre-calculate sensors once so Frame 0 doesn't crash
-    for car in cars:
-        car.check_radar(map_mask)
+    # Pre-calc radars (Prevent index error on frame 0)
+    for car in cars: car.check_radar(map_mask)
 
-    while running and len(cars) > 0 and frame_count < max_frames:
+    while running and len(cars) > 0:
         frame_count += 1
         
-        # A. Handle Pygame Events (Quit)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+        # 1. SHORTS TIME LIMIT
+        if frame_count > MAX_FRAMES:
+            print("⏱️ CUT! Max Short duration reached.")
+            break
 
-        # B. Camera Tracking (Follow the Leader)
+        # 2. Events
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT: sys.exit()
+
+        # 3. Camera Logic
         leader = max(cars, key=lambda c: c.distance_traveled)
         camera.update(leader)
-        
-        # Visual flair: Only the leader gets the "Hero" color
         for c in cars: c.is_leader = (c == leader)
 
-        # C. AI Logic & Physics
+        # 4. AI Logic
         for i, car in enumerate(cars):
             if not car.alive: continue
+            
+            # Inputs (Normalized)
+            if len(car.radars) < 5: inputs = [0] * 5
+            else: inputs = [d[1] / simulation.SENSOR_LENGTH for d in car.radars]
 
-            # 1. Get Inputs
-            # Safety: If radar somehow failed, fill with 0s
-            if len(car.radars) < 5:
-                inputs = [0] * 5
-            else:
-                # Normalize input (0 to 1) for the Neural Net
-                inputs = [d[1] / simulation.SENSOR_LENGTH for d in car.radars]
-
-            # 2. Activate Brain
+            # Neural Net Decision
             output = nets[i].activate(inputs)
             
-            # 3. Apply Controls
-            # Output 0: Steering (Left/Right)
-            if output[0] > 0.5: car.rotate(right=True)
-            elif output[0] < -0.5: car.rotate(left=True)
+            # Output 0: Steering (-1=Left, 1=Right)
+            steering_out = output[0]
+            if steering_out > 0.5: car.input_steer(right=True)
+            elif steering_out < -0.5: car.input_steer(left=True)
             
-            # Output 1: Speed (Optional - currently constant)
-            # if output[1] > 0.5: car.speed = 15 
-            
-            # 4. Update Physics (Moves car AND updates Radar for next frame)
-            car.update(map_mask)
-            
-            # 5. Fitness Rewards
-            # Reward for distance
-            ge[i].fitness += (car.speed / 10) 
-            # Tiny reward for existing (encourages not crashing immediately)
-            ge[i].fitness += 0.1
+            # Auto-Gas
+            car.input_gas()
 
-        # D. Cleanup Dead Cars
+            # Physics Update
+            car.update(map_mask)
+            car.check_radar(map_mask)
+            
+            # Fitness Rules
+            # Reward Distance & Speed
+            ge[i].fitness += car.velocity.length()
+            
+            # Penalize stopping/spinning
+            if car.velocity.length() < 1: ge[i].fitness -= 2
+
+        # 5. Cleanup Dead
         for i in range(len(cars) - 1, -1, -1):
             if not cars[i].alive:
-                ge[i].fitness -= 5 # Penalty for dying
+                ge[i].fitness -= 10 # Crash Penalty
                 cars.pop(i)
                 nets.pop(i)
                 ge.pop(i)
 
-        if len(cars) == 0:
-            break
-
-        # E. Render (Only if recording or watching)
-        # If we are NOT recording and just training, we could skip drawing to speed up
-        # But for now, we draw everything to see it.
-        
-        screen.fill(simulation.COL_BG)
-        
-        # Draw World (Camera Adjusted)
-        screen.blit(visual_map, (camera.camera.x, camera.camera.y))
-        
-        # Draw Cars
-        for car in cars:
-            car.draw(screen, camera)
+        # 6. Render
+        # Only draw every frame if recording, otherwise skip frames for speed
+        if recording or frame_count % 5 == 0:
+            screen.fill(simulation.COL_BG)
+            screen.blit(visual_map, (camera.camera.x, camera.camera.y))
             
-        # Draw HUD
-        font = pygame.font.SysFont("consolas", 30, bold=True)
-        text = font.render(f"GEN: {GENERATION} | ALIVE: {len(cars)}", True, (255, 255, 255))
-        screen.blit(text, (20, 20))
+            for car in cars:
+                car.draw(screen, camera)
+            
+            # HUD
+            font = pygame.font.SysFont("consolas", 40, bold=True)
+            # Timer
+            seconds = int(frame_count / FPS)
+            time_lbl = font.render(f"{seconds}s / 58s", True, (255, 255, 255))
+            gen_lbl = font.render(f"GEN {GENERATION}", True, simulation.COL_WALL)
+            
+            screen.blit(gen_lbl, (20, 20))
+            screen.blit(time_lbl, (20, 60))
+            
+            pygame.display.flip()
 
-        pygame.display.flip()
+            # Capture Frame
+            if recording:
+                try:
+                    pixels = pygame.surfarray.array3d(screen)
+                    pixels = np.transpose(pixels, (1, 0, 2))
+                    writer.append_data(pixels)
+                except: pass
 
-        # F. Capture Frame for Video
-        if writer:
-            try:
-                # Capture the screen surface
-                pixels = pygame.surfarray.array3d(screen)
-                # Rotate because surfarray is (width, height, color) but video wants (height, width, color)
-                pixels = np.transpose(pixels, (1, 0, 2))
-                writer.append_data(pixels)
-            except Exception as e:
-                print(f"Frame capture failed: {e}")
-
-    # End of Gen Cleanup
+    # End Generation
     if writer:
         writer.close()
-        print(f"✅ Video saved: gen_{GENERATION}.mp4")
+        # Trigger Post-Production
+        add_sound_and_export(temp_video_path, GENERATION)
+        # Delete temp file to save space
+        if os.path.exists(temp_video_path):
+            os.remove(temp_video_path)
 
 def run_neat(config_path):
-    # Setup NEAT
     config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
                                 neat.DefaultSpeciesSet, neat.DefaultStagnation,
                                 config_path)
     
-    # Create Population
     p = neat.Population(config)
-    
-    # Add Reporters
     p.add_reporter(neat.StdOutReporter(True))
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
     
-    # Run!
     winner = p.run(run_simulation, MAX_GENERATIONS)
-    
-    # Save best AI
     with open("best.pickle", "wb") as f:
         pickle.dump(winner, f)
 
