@@ -1,0 +1,37 @@
+{
+    "theme_key": "CIRCUIT",
+    "map_seed": 799458,
+    "physics": {
+        "friction": 0.97
+    },
+    "visuals": {
+        "bg": [
+            30,
+            35,
+            30
+        ],
+        "road": [
+            50,
+            50,
+            55
+        ],
+        "wall": [
+            200,
+            0,
+            0
+        ],
+        "center": [
+            80,
+            80,
+            80
+        ]
+    },
+    "meta": {
+        "title": "AI Learns to Race F1 Style \ud83c\udfce\ufe0f (Gen {gen})",
+        "tags": [
+            "f1",
+            "racing",
+            "motorsport"
+        ]
+    }
+}
