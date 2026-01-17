@@ -1,6 +1,8 @@
 import pygame
 import neat
 import os
+os.environ["SDL_VIDEODRIVER"] = "dummy"
+os.environ["SDL_AUDIODRIVER"] = "dummy"
 import sys
 import pickle
 import imageio
