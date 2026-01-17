@@ -1,7 +1,6 @@
 import os
 
 # --- HEADLESS SERVER FIXES (MUST BE FIRST) ---
-# This prevents the ALSA audio errors on GitHub Actions
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 os.environ["SDL_AUDIODRIVER"] = "dummy"
 
@@ -12,6 +11,9 @@ if not hasattr(PIL.Image, 'ANTIALIAS'):
 
 import random
 from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, concatenate_videoclips, AudioFileClip
+# --- FIX: Import the loop function specifically ---
+from moviepy.audio.fx.all import audio_loop
+
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -19,35 +21,33 @@ from googleapiclient.http import MediaFileUpload
 # CONFIG
 CLIPS_DIR = "training_clips"
 OUTPUT_FILE = "evolution_short.mp4"
-MUSIC_FILE = "music.mp3"  # Make sure you upload a royalty-free track with this name!
+MUSIC_FILE = "music.mp3" 
 
 def make_video():
     print("🎬 Starting Auto-Edit...")
     
-    # 1. Validation: Do we have clips?
+    # 1. Validation
     if not os.path.exists(CLIPS_DIR):
-        print(f"❌ Error: Directory '{CLIPS_DIR}' not found. You must run the simulation first.")
+        print(f"❌ Error: Directory '{CLIPS_DIR}' not found.")
         return None
 
     files = [f for f in os.listdir(CLIPS_DIR) if f.endswith(".mp4")]
     if not files:
-        print("❌ Error: No .mp4 files found in clips directory. Simulation might have failed.")
+        print("❌ Error: No .mp4 files found.")
         return None
 
-    # 2. Sort Clips (Gen 1, Gen 2, etc.)
-    # Filename format expected: "gen_1.mp4", "gen_10.mp4"
+    # 2. Sort Clips
     try:
         files = sorted(files, key=lambda x: int(x.split('_')[1].split('.')[0]))
     except Exception as e:
-        print(f"⚠️ Warning: Filenames weird, sorting alphabetically. ({e})")
+        print(f"⚠️ Warning: Sorting failed, using default order. ({e})")
         files.sort()
 
-    # 3. Select the Narrative Arc (Start -> Struggle -> Success)
-    # We pick: First Generation, Middle Generation, Final Generation
+    # 3. Select Narrative Arc (Start, Middle, End)
     if len(files) >= 3:
         selected_files = [files[0], files[len(files)//2], files[-1]]
     else:
-        selected_files = files # Just use what we have
+        selected_files = files 
 
     print(f"🎞️ Stitching these clips: {selected_files}")
     
@@ -56,29 +56,28 @@ def make_video():
         path = os.path.join(CLIPS_DIR, filename)
         clip = VideoFileClip(path)
         
-        # Resize to Vertical 1080p (if needed)
+        # Resize if needed
         if clip.w > 1080: clip = clip.resize(width=1080)
         
-        # Get Generation Number for Text
+        # Get Gen Number
         try:
             gen_num = int(filename.split('_')[1].split('.')[0])
         except: 
             gen_num = 0
         
-        # Dynamic Text Logic
+        # Text Logic
         if gen_num <= 5: 
             label = f"Gen {gen_num}: NOOB 🤡"
             color = 'red'
         elif gen_num >= 20: 
             label = f"Gen {gen_num}: GOD MODE 🤯"
-            color = '#00FF41' # Matrix Green
+            color = '#00FF41' 
         else:
             label = f"Gen {gen_num}: Training..."
             color = 'white'
 
-        # Overlay Text (With Linux Fallback)
         try:
-            # 'DejaVu-Sans-Bold' is safer on Linux servers than 'Impact'
+            # Use DejaVu-Sans-Bold for Linux compatibility
             txt = TextClip(
                 label, 
                 fontsize=80, 
@@ -88,34 +87,32 @@ def make_video():
                 stroke_width=3
             ).set_position(('center', 200)).set_duration(clip.duration)
             
-            # Combine Clip + Text
             comp = CompositeVideoClip([clip, txt])
             clips.append(comp)
         except Exception as e:
-            print(f"⚠️ TextClip Failed (ImageMagick missing?): {e}")
-            # Fallback: Use clip without text
+            print(f"⚠️ TextClip Failed (Skipping text): {e}")
             clips.append(clip)
 
-    # 4. Concatenate All Parts
+    # 4. Concatenate
     final_video = concatenate_videoclips(clips, method="compose")
 
-    # 5. Add Music (Viral Necessity)
+    # 5. Add Music (THE FIX IS HERE)
     if os.path.exists(MUSIC_FILE):
         print(f"🎵 Layering Background Music: {MUSIC_FILE}")
         music = AudioFileClip(MUSIC_FILE)
         
-        # Loop music if video is longer, cut if shorter
+        # Loop music using the imported function
         if music.duration < final_video.duration:
-            music = music.loop(duration=final_video.duration)
+            music = audio_loop(music, duration=final_video.duration)
         else:
             music = music.subclip(0, final_video.duration)
             
-        music = music.volumex(0.6) # 60% volume
+        music = music.volumex(0.6) 
         final_video = final_video.set_audio(music)
     else:
         print("⚠️ Warning: 'music.mp3' not found. Video will be silent.")
 
-    # 6. Render Final File
+    # 6. Render
     print(f"💾 Rendering {OUTPUT_FILE}...")
     final_video.write_videofile(
         OUTPUT_FILE, 
@@ -123,7 +120,7 @@ def make_video():
         codec='libx264', 
         audio_codec='aac',
         preset='fast',
-        logger=None # Keep logs clean
+        logger=None 
     )
     print("✅ Video Successfully Rendered.")
     return OUTPUT_FILE
@@ -144,7 +141,6 @@ def upload_video():
         description = (
             "I built an evolutionary AI in Python to learn how to drive.\n"
             "Watch it go from crashing instantly to drifting like a pro.\n\n"
-            "Source Code: [Link in Bio]\n"
             "#machinelearning #python #ai #neuralnetwork"
         )
 
@@ -155,7 +151,7 @@ def upload_video():
                     "title": title,
                     "description": description,
                     "tags": ["ai", "python", "machine learning", "coding"],
-                    "categoryId": "28" # Science & Tech
+                    "categoryId": "28"
                 },
                 "status": { "privacyStatus": "public" }
             },
