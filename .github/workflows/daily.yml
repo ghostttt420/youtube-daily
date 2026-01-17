@@ -2,22 +2,20 @@ name: Project Evolution Daily
 
 on:
   schedule:
-    # Runs at 9:00 AM, 3:00 PM, 9:00 PM (UTC approx)
     - cron: '0 9,15,21 * * *'
-  workflow_dispatch: # Allows manual trigger button
+  workflow_dispatch:
 
 jobs:
   run_evolution:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # CRITICAL: Allows bot to push changes (save brains)
 
     env:
-      # CRITICAL: Tells Pygame to run without a monitor
       SDL_VIDEODRIVER: dummy 
-      # Secrets for YouTube Upload
       YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
       YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
-      # Helper for MoviePy on Linux
       IMAGEMAGICK_BINARY: /usr/bin/convert
 
     steps:
@@ -29,46 +27,42 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install System Dependencies
-        # Installs FFmpeg (Video), SDL (Pygame), ImageMagick (Text Overlay)
+      - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg libsdl2-dev imagemagick
-
-      - name: Fix ImageMagick Policy
-        # Security fix to allow MoviePy to write text on video
-        run: |
           sudo sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml
-
-      - name: Install Python Libraries
-        run: |
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # --- PHASE 4: ASSET GENERATION ---
-      # This creates the F1 car images before the brain starts
-      - name: Generate Game Assets
+      # 1. GENERATE THEME (Colors/Physics)
+      - name: Daily Config
+        run: python daily_config.py
+
+      # 2. PAINT ASSETS (Based on Theme)
+      - name: Generate Assets
         run: python assets.py
 
-      # --- SIMULATION ---
-      # Runs the NEAT algorithm and saves clips to 'training_clips/'
+      # 3. EVOLVE (Reads checkpoints, runs sim)
       - name: Run Simulation
         run: python ai_brain.py
 
-      # --- DEBUG STEP ---
-      # Lists files to ensure simulation worked
-      - name: Verify Clips
-        run: ls -R training_clips/ || echo "Directory not found"
-
-      # --- RENDER & UPLOAD ---
-      # Stitches clips, adds music, and uploads to YouTube
-      - name: Edit & Upload Video
+      # 4. RENDER & UPLOAD
+      - name: Edit & Upload
         run: python final_render.py
 
-      - name: Upload Artifact
-        # Saves the video to GitHub interface for you to download manually if needed
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: daily-evolution-video
-          path: evolution_short.mp4
+      # 5. PERSISTENCE (Save the Brain!)
+      - name: Save Brain Progress
+        run: |
+          git config --global user.name "Auto-Evolution Bot"
+          git config --global user.email "bot@factghost.com"
+          
+          # Add new checkpoints and theme
+          git add neat-checkpoint-*
+          git add theme.json
+          
+          # Clean up old clips to keep repo light (optional but recommended)
+          # git rm training_clips/*.mp4 --ignore-unmatch
+          
+          git commit -m "🧠 Brain Evolution: Gen Update [skip ci]" || echo "No changes to commit"
+          git push
