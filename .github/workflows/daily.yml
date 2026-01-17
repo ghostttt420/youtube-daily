@@ -43,10 +43,6 @@ jobs:
       - name: Generate Assets
         run: python assets.py
 
-      - name: WIPE OLD MEMORY (Hard Reset)
-        run: rm -f neat-checkpoint-* best.pickle theme.json
-
-
       # 3. EVOLVE (Reads checkpoints, runs sim)
       - name: Run Simulation
         run: python ai_brain.py
