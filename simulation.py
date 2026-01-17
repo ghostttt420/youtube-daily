@@ -58,10 +58,10 @@ class Car:
         
         self.radars = []
         self.alive = True
-        self.distance_traveled = 0 # Visual only now
+        self.distance_traveled = 0 # Visual only
         self.is_leader = False
         
-        # --- NEW: GATE SYSTEM ---
+        # --- NEW: GATE SYSTEM (Fixes Donuts) ---
         self.gates_passed = 0
         self.next_gate_idx = 0
         
@@ -81,26 +81,19 @@ class Car:
         self.acceleration = self.acceleration_rate
 
     def check_gates(self, checkpoints):
-        """
-        Checks if the car has reached the next invisible gate.
-        Returns True if a gate was passed (for Reward).
-        """
+        """Returns True if the car hits the next invisible checkpoint."""
         if not self.alive: return False
         
-        # Get target gate position
-        # We use modulo % so the car can drive laps indefinitely
         target_idx = self.next_gate_idx % len(checkpoints)
         target_pos = pygame.math.Vector2(checkpoints[target_idx])
         
-        # Distance to gate
         distance = self.position.distance_to(target_pos)
         
-        # Gate Hit Radius (Increased to ensure they catch it)
-        if distance < 200:
+        # Hit radius 250px
+        if distance < 250:
             self.gates_passed += 1
             self.next_gate_idx += 1
-            return True # REWARD!
-            
+            return True # Reward!
         return False
 
     def update(self, map_mask):
@@ -125,7 +118,6 @@ class Car:
                 self.skid_marks.append([self.position + offset_r, 20])
 
         self.position += self.velocity
-        # We still track distance for the camera logic, but NOT for fitness
         self.distance_traveled += self.velocity.length()
         self.rect.center = (int(self.position.x), int(self.position.y))
         self.acceleration = 0
@@ -181,8 +173,12 @@ class Car:
         screen.blit(rotated_shadow, (cam_pos[0] + 6, cam_pos[1] + 8))
         screen.blit(rotated_img, cam_pos)
         
-        # DEBUG SENSORS (Disabled for production)
-        # if self.is_leader: ...
+        # --- CLEANUP: SENSORS ARE NOW HIDDEN ---
+        # if self.is_leader:
+        #     for radar in self.radars:
+        #         end = camera.apply_point(radar[0])
+        #         start = camera.apply_point(self.position)
+        #         pygame.draw.line(screen, (0, 255, 0), start, end, 1)
 
 class Camera:
     def __init__(self, width, height):
@@ -227,19 +223,17 @@ class TrackGenerator:
         try:
             pts = np.array(points)
             tck, u = splprep(pts.T, u=None, s=0.0, per=1)
-            # High resolution for drawing
             u_new = np.linspace(u.min(), u.max(), 4000)
             x_new, y_new = splev(u_new, tck, der=0)
             smooth_points = list(zip(x_new, y_new))
             
             # --- GENERATE CHECKPOINTS ---
-            # We take every 50th point as a "Gate"
+            # Every 50th point is an invisible gate
             checkpoints = smooth_points[::50] 
         except:
             smooth_points = points
             checkpoints = points
 
-        # Draw Layers
         pygame.draw.lines(phys_surf, (255, 255, 255), True, smooth_points, 450) 
         
         pygame.draw.lines(vis_surf, THEME["visuals"]["wall"], True, smooth_points, 480) 
@@ -248,5 +242,4 @@ class TrackGenerator:
         pygame.draw.lines(vis_surf, THEME["visuals"]["center"], True, smooth_points, 4)
 
         start_x, start_y = x_new[0], y_new[0]
-        # Return Checkpoints too!
         return (int(start_x), int(start_y)), phys_surf, vis_surf, checkpoints
