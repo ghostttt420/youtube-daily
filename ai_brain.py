@@ -15,8 +15,8 @@ import simulation
 # CONFIG
 MAX_GENERATIONS = 30
 VIDEO_OUTPUT_DIR = "training_clips"
-RECORD_GENS = [5, 10, 15, 20, 25, 29] 
 FPS = 30 
+# Max duration for the PRO clip (allow it to finish the lap)
 MAX_FRAMES = FPS * 120 
 
 if not os.path.exists(VIDEO_OUTPUT_DIR): os.makedirs(VIDEO_OUTPUT_DIR)
@@ -33,7 +33,6 @@ def run_dummy_generation():
     pygame.init()
     screen = pygame.display.set_mode((simulation.WIDTH, simulation.HEIGHT))
     
-    # Unpack Checkpoints (even though dummy ignores them)
     map_gen = simulation.TrackGenerator(seed=THEME["map_seed"])
     start_pos, track_surface, visual_map, checkpoints = map_gen.generate_track()
     map_mask = pygame.mask.from_surface(track_surface)
@@ -49,7 +48,7 @@ def run_dummy_generation():
     
     while running and len(cars) > 0:
         frame_count += 1
-        if frame_count > 300: break 
+        if frame_count > 300: break # 10s of chaos
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT: sys.exit()
@@ -97,7 +96,6 @@ def run_simulation(genomes, config):
     pygame.init()
     screen = pygame.display.set_mode((simulation.WIDTH, simulation.HEIGHT))
     
-    # UNPACK CHECKPOINTS
     map_gen = simulation.TrackGenerator(seed=THEME["map_seed"])
     start_pos, track_surface, visual_map, checkpoints = map_gen.generate_track()
     map_mask = pygame.mask.from_surface(track_surface)
@@ -115,7 +113,7 @@ def run_simulation(genomes, config):
     should_record = (GENERATION == MAX_GENERATIONS)
     
     if should_record:
-        print(f"🎥 Recording Gen {GENERATION}...")
+        print(f"🎥 Recording Gen {GENERATION} (The Pro Run)...")
         writer = imageio.get_writer(video_path, fps=FPS)
 
     running = True
@@ -129,7 +127,7 @@ def run_simulation(genomes, config):
         for event in pygame.event.get():
             if event.type == pygame.QUIT: sys.exit()
 
-        # Follow leader based on GATES now, not just distance
+        # Camera follows the car with most GATES passed
         leader = max(cars, key=lambda c: c.gates_passed * 1000 + c.distance_traveled)
         camera.update(leader)
         for c in cars: c.is_leader = (c == leader)
@@ -148,16 +146,15 @@ def run_simulation(genomes, config):
             car.update(map_mask)
             car.check_radar(map_mask)
             
-            # --- NEW FITNESS FUNCTION (THE FIX) ---
-            # 1. Reward passing gates (Primary Goal)
+            # --- THE DONUT FIX ---
+            # Massive Reward for hitting a checkpoint
             if car.check_gates(checkpoints):
-                ge[i].fitness += 500 # Huge reward for progress
-                # Give extension time if they hit a gate?
+                ge[i].fitness += 500 
                 
-            # 2. Minor reward for speed (Tie-breaker)
+            # Tie-breaker points for speed
             ge[i].fitness += car.velocity.length() * 0.1
             
-            # 3. Penalty for barely moving (Anti-Camping)
+            # Penalty for stopping
             if car.velocity.length() < 1: 
                 ge[i].fitness -= 1
 
@@ -191,8 +188,11 @@ def run_simulation(genomes, config):
 def run_neat(config_path):
     global GENERATION
     GENERATION = 0
+    
+    # 1. RUN THE DUMMY GEN
     run_dummy_generation()
     
+    # 2. RUN REAL EVOLUTION
     config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
                                 neat.DefaultSpeciesSet, neat.DefaultStagnation,
                                 config_path)
