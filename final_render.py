@@ -1,6 +1,6 @@
 import os
 
-# --- HEADLESS SERVER FIXES (MUST BE FIRST) ---
+# --- HEADLESS SERVER FIXES ---
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 os.environ["SDL_AUDIODRIVER"] = "dummy"
 
@@ -10,8 +10,8 @@ if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 
 import random
-from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, concatenate_videoclips, AudioFileClip
-# --- FIX: Import the loop function specifically ---
+from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, concatenate_videoclips, AudioFileClip, vfx
+# Import audio loop
 from moviepy.audio.fx.all import audio_loop
 
 from google.oauth2.credentials import Credentials
@@ -23,8 +23,14 @@ CLIPS_DIR = "training_clips"
 OUTPUT_FILE = "evolution_short.mp4"
 MUSIC_FILE = "music.mp3" 
 
+# --- TIME BUDGET CONFIG ---
+# Strict 59s limit for Shorts. We leave 1s buffer.
+TOTAL_DURATION_LIMIT = 58 
+GEN_1_LIMIT = 8   # Only show 8s of failing
+GEN_MID_LIMIT = 5 # Show 5s of progress
+
 def make_video():
-    print("🎬 Starting Auto-Edit...")
+    print("🎬 Starting Smart-Edit...")
     
     # 1. Validation
     if not os.path.exists(CLIPS_DIR):
@@ -40,19 +46,22 @@ def make_video():
     try:
         files = sorted(files, key=lambda x: int(x.split('_')[1].split('.')[0]))
     except Exception as e:
-        print(f"⚠️ Warning: Sorting failed, using default order. ({e})")
+        print(f"⚠️ Warning: Sorting failed. ({e})")
         files.sort()
 
-    # 3. Select Narrative Arc (Start, Middle, End)
+    # 3. Select Narrative Arc
     if len(files) >= 3:
+        # Start, Middle, End
         selected_files = [files[0], files[len(files)//2], files[-1]]
     else:
         selected_files = files 
 
-    print(f"🎞️ Stitching these clips: {selected_files}")
+    print(f"🎞️ Stitching: {selected_files}")
     
     clips = []
-    for filename in selected_files:
+    
+    # --- SMART EDITING LOOP ---
+    for i, filename in enumerate(selected_files):
         path = os.path.join(CLIPS_DIR, filename)
         clip = VideoFileClip(path)
         
@@ -62,22 +71,49 @@ def make_video():
         # Get Gen Number
         try:
             gen_num = int(filename.split('_')[1].split('.')[0])
-        except: 
-            gen_num = 0
+        except: gen_num = 0
         
-        # Text Logic
-        if gen_num <= 5: 
+        # --- TIME BUDGETING LOGIC ---
+        # Clip 0 (Gen 1 - The Noob): Hard Cut at 8 seconds
+        if i == 0:
+            if clip.duration > GEN_1_LIMIT:
+                clip = clip.subclip(0, GEN_1_LIMIT)
             label = f"Gen {gen_num}: NOOB 🤡"
             color = 'red'
-        elif gen_num >= 20: 
-            label = f"Gen {gen_num}: GOD MODE 🤯"
-            color = '#00FF41' 
-        else:
-            label = f"Gen {gen_num}: Training..."
+
+        # Clip 1 (The Middle - Progress): Speed Up 2x, Cut to 5s
+        elif i == 1 and len(selected_files) > 2:
+            clip = clip.fx(vfx.speedx, 2.0) # Double speed
+            if clip.duration > GEN_MID_LIMIT:
+                clip = clip.subclip(0, GEN_MID_LIMIT)
+            label = f"Gen {gen_num}: Learning..."
             color = 'white'
 
+        # Clip 2 (The Hero): Fill remaining time
+        else:
+            # Calculate time used so far
+            current_duration = sum([c.duration for c in clips])
+            time_left = TOTAL_DURATION_LIMIT - current_duration
+            
+            if time_left < 5: time_left = 10 # Safety buffer
+            
+            # If the run is longer than time left, SPEED IT UP to fit!
+            # This ensures we see the finish line, just faster.
+            if clip.duration > time_left:
+                speed_factor = clip.duration / time_left
+                # Cap speed to avoid looking ridiculous (max 4x)
+                speed_factor = min(speed_factor, 4.0) 
+                clip = clip.fx(vfx.speedx, speed_factor)
+                
+                # Hard cut if still too long (rare)
+                if clip.duration > time_left:
+                    clip = clip.subclip(0, time_left)
+
+            label = f"Gen {gen_num}: PRO 🏎️"
+            color = '#00FF41' 
+
+        # Add Text Overlay
         try:
-            # Use DejaVu-Sans-Bold for Linux compatibility
             txt = TextClip(
                 label, 
                 fontsize=80, 
@@ -90,18 +126,18 @@ def make_video():
             comp = CompositeVideoClip([clip, txt])
             clips.append(comp)
         except Exception as e:
-            print(f"⚠️ TextClip Failed (Skipping text): {e}")
+            print(f"⚠️ Text Error: {e}")
             clips.append(clip)
 
     # 4. Concatenate
     final_video = concatenate_videoclips(clips, method="compose")
+    print(f"⏱️ Final Duration: {final_video.duration} seconds")
 
-    # 5. Add Music (THE FIX IS HERE)
+    # 5. Add Music
     if os.path.exists(MUSIC_FILE):
-        print(f"🎵 Layering Background Music: {MUSIC_FILE}")
+        print(f"🎵 Layering Music: {MUSIC_FILE}")
         music = AudioFileClip(MUSIC_FILE)
         
-        # Loop music using the imported function
         if music.duration < final_video.duration:
             music = audio_loop(music, duration=final_video.duration)
         else:
@@ -109,8 +145,6 @@ def make_video():
             
         music = music.volumex(0.6) 
         final_video = final_video.set_audio(music)
-    else:
-        print("⚠️ Warning: 'music.mp3' not found. Video will be silent.")
 
     # 6. Render
     print(f"💾 Rendering {OUTPUT_FILE}...")
@@ -122,7 +156,6 @@ def make_video():
         preset='fast',
         logger=None 
     )
-    print("✅ Video Successfully Rendered.")
     return OUTPUT_FILE
 
 def upload_video():
@@ -137,10 +170,10 @@ def upload_video():
         )
         youtube = build("youtube", "v3", credentials=creds)
 
-        title = "AI Learns to Drive in 60 Seconds 🧠🚗 #shorts"
+        title = "AI Learns to Drive (Gen 1 vs Gen 30) 🧠🚗 #shorts"
         description = (
-            "I built an evolutionary AI in Python to learn how to drive.\n"
-            "Watch it go from crashing instantly to drifting like a pro.\n\n"
+            "Evolutionary AI learns to race from scratch.\n"
+            "Watch the progress from crashing to drifting!\n\n"
             "#machinelearning #python #ai #neuralnetwork"
         )
 
