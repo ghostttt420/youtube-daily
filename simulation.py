@@ -10,7 +10,6 @@ try:
     with open("theme.json", "r") as f:
         THEME = json.load(f)
 except:
-    # Default fallback
     THEME = {
         "map_seed": 42,
         "physics": {"friction": 0.97}, 
@@ -28,21 +27,17 @@ WORLD_SIZE = 4000
 SENSOR_LENGTH = 300
 FPS = 30 
 
-# Visual Constants (Used by Brain for HUD)
+# Visual Constants
 COL_BG = THEME["visuals"]["bg"]
 COL_WALL = THEME["visuals"]["wall"]
 
 # --- ASSET LOADING HELPER ---
 def load_sprite(filename, scale_size=None):
-    """Safely loads assets, creating a placeholder if missing."""
     path = os.path.join("assets", filename)
-    
-    # Fallback if assets.py wasn't run (prevents crashes during local tests)
     if not os.path.exists(path):
         surf = pygame.Surface((scale_size if scale_size else (40, 60)))
         surf.fill((255, 0, 255)) 
         return surf
-        
     img = pygame.image.load(path)
     if scale_size:
         img = pygame.transform.scale(img, scale_size)
@@ -50,34 +45,32 @@ def load_sprite(filename, scale_size=None):
 
 class Car:
     def __init__(self, start_pos):
-        # 1. Physics State
         self.position = pygame.math.Vector2(start_pos)
         self.velocity = pygame.math.Vector2(0, 0)
-        self.angle = -90 # Pointing Up in Pygame (270 deg)
+        self.angle = -90 
         self.acceleration = 0.0
         self.steering = 0.0
         
-        # DYNAMIC PHYSICS FROM THEME
         self.max_speed = 28      
         self.friction = THEME["physics"]["friction"] 
         self.acceleration_rate = 1.2
         self.turn_speed = 0.18   
         
-        # 3. Game State
         self.radars = []
         self.alive = True
-        self.distance_traveled = 0
+        self.distance_traveled = 0 # Visual only now
         self.is_leader = False
         
-        # 4. Visual Assets
+        # --- NEW: GATE SYSTEM ---
+        self.gates_passed = 0
+        self.next_gate_idx = 0
+        
+        # Assets
         self.sprite_norm = load_sprite("car_normal.png", (50, 85))
         self.sprite_leader = load_sprite("car_leader.png", (50, 85))
-        
-        # Create Shadow (Generic black blob)
         self.shadow_surf = pygame.Surface((50, 85), pygame.SRCALPHA)
         pygame.draw.ellipse(self.shadow_surf, (0, 0, 0, 80), (0, 0, 50, 85))
-
-        self.skid_marks = [] # Stores tire tracks
+        self.skid_marks = [] 
         self.rect = self.sprite_norm.get_rect(center=self.position)
 
     def input_steer(self, left=False, right=False):
@@ -87,48 +80,61 @@ class Car:
     def input_gas(self):
         self.acceleration = self.acceleration_rate
 
+    def check_gates(self, checkpoints):
+        """
+        Checks if the car has reached the next invisible gate.
+        Returns True if a gate was passed (for Reward).
+        """
+        if not self.alive: return False
+        
+        # Get target gate position
+        # We use modulo % so the car can drive laps indefinitely
+        target_idx = self.next_gate_idx % len(checkpoints)
+        target_pos = pygame.math.Vector2(checkpoints[target_idx])
+        
+        # Distance to gate
+        distance = self.position.distance_to(target_pos)
+        
+        # Gate Hit Radius (Increased to ensure they catch it)
+        if distance < 200:
+            self.gates_passed += 1
+            self.next_gate_idx += 1
+            return True # REWARD!
+            
+        return False
+
     def update(self, map_mask):
         if not self.alive: return
 
-        # --- PHYSICS ENGINE ---
         self.velocity *= self.friction
-        
-        # Acceleration Vector
         rad = math.radians(self.angle)
         accel_vec = pygame.math.Vector2(math.cos(rad), math.sin(rad)) * self.acceleration
         self.velocity += accel_vec
 
-        # Speed Cap
         if self.velocity.length() > self.max_speed:
             self.velocity.scale_to_length(self.max_speed)
             
-        # Turning Logic (Only turn if moving)
         if self.velocity.length() > 2:
             rotation = self.steering * self.velocity.length() * self.turn_speed
             self.angle += rotation
             
-            # --- SKID MARK GENERATOR ---
             if abs(self.steering) > 0.5 and self.velocity.length() > 15:
                 offset_l = pygame.math.Vector2(-15, -20).rotate(self.angle)
                 offset_r = pygame.math.Vector2(-15, 20).rotate(self.angle)
                 self.skid_marks.append([self.position + offset_l, 20]) 
                 self.skid_marks.append([self.position + offset_r, 20])
 
-        # Apply Velocity
         self.position += self.velocity
+        # We still track distance for the camera logic, but NOT for fitness
         self.distance_traveled += self.velocity.length()
         self.rect.center = (int(self.position.x), int(self.position.y))
-
-        # Reset Inputs
         self.acceleration = 0
         self.steering = 0
         
-        # Check Wall Collision
         self.check_collision(map_mask)
 
     def check_collision(self, map_mask):
         try:
-            # Check center point
             if map_mask.get_at((int(self.position.x), int(self.position.y))) == 0:
                 self.alive = False
         except IndexError:
@@ -154,7 +160,6 @@ class Car:
         self.radars.append([(int(check.x), int(check.y)), length])
 
     def draw(self, screen, camera):
-        # 1. Draw Skid Marks
         for i in range(len(self.skid_marks) - 1, -1, -1):
             pos, life = self.skid_marks[i]
             life -= 1
@@ -166,28 +171,18 @@ class Car:
 
         if not self.alive: return
 
-        # 2. Select Sprite
         img = self.sprite_leader if self.is_leader else self.sprite_norm
-        
-        # 3. Rotation
         rotated_img = pygame.transform.rotate(img, -self.angle - 90)
         rotated_shadow = pygame.transform.rotate(self.shadow_surf, -self.angle - 90)
         
-        # 4. Positioning
         rect = rotated_img.get_rect(center=self.position)
         cam_pos = camera.apply(rect).topleft
         
-        # 5. Blit Shadow
         screen.blit(rotated_shadow, (cam_pos[0] + 6, cam_pos[1] + 8))
-        # 6. Blit Car
         screen.blit(rotated_img, cam_pos)
         
-        # 7. Draw Sensors (DISABLED FOR PRODUCTION VIDEO)
-        # if self.is_leader:
-        #     for radar in self.radars:
-        #         end = camera.apply_point(radar[0])
-        #         start = camera.apply_point(self.position)
-        #         pygame.draw.line(screen, (0, 255, 0), start, end, 1)
+        # DEBUG SENSORS (Disabled for production)
+        # if self.is_leader: ...
 
 class Camera:
     def __init__(self, width, height):
@@ -204,12 +199,9 @@ class Camera:
     def update(self, target):
         x = -target.rect.centerx + int(WIDTH / 2)
         y = -target.rect.centery + int(HEIGHT / 2)
-        
-        # Clamp camera to world bounds
         x = min(0, max(-(self.width - WIDTH), x))
         y = min(0, max(-(self.height - HEIGHT), y))
         self.camera = pygame.Rect(x, y, self.width, self.height)
-
 
 class TrackGenerator:
     def __init__(self, seed):
@@ -220,7 +212,7 @@ class TrackGenerator:
         vis_surf = pygame.Surface((WORLD_SIZE, WORLD_SIZE))
         
         phys_surf.fill((0,0,0)) 
-        vis_surf.fill(THEME["visuals"]["bg"]) # Dynamic BG
+        vis_surf.fill(THEME["visuals"]["bg"]) 
         
         points = []
         n_points = 20
@@ -235,21 +227,26 @@ class TrackGenerator:
         try:
             pts = np.array(points)
             tck, u = splprep(pts.T, u=None, s=0.0, per=1)
+            # High resolution for drawing
             u_new = np.linspace(u.min(), u.max(), 4000)
             x_new, y_new = splev(u_new, tck, der=0)
             smooth_points = list(zip(x_new, y_new))
+            
+            # --- GENERATE CHECKPOINTS ---
+            # We take every 50th point as a "Gate"
+            checkpoints = smooth_points[::50] 
         except:
             smooth_points = points
+            checkpoints = points
 
-        # --- DRAWING LAYERS ---
-        # 1. Physics Mask (The "Real" Road)
+        # Draw Layers
         pygame.draw.lines(phys_surf, (255, 255, 255), True, smooth_points, 450) 
         
-        # 2. Visual Track (The "F1" Look)
         pygame.draw.lines(vis_surf, THEME["visuals"]["wall"], True, smooth_points, 480) 
         pygame.draw.lines(vis_surf, (220, 220, 220), True, smooth_points, 450) 
         pygame.draw.lines(vis_surf, THEME["visuals"]["road"], True, smooth_points, 420) 
         pygame.draw.lines(vis_surf, THEME["visuals"]["center"], True, smooth_points, 4)
 
         start_x, start_y = x_new[0], y_new[0]
-        return (int(start_x), int(start_y)), phys_surf, vis_surf
+        # Return Checkpoints too!
+        return (int(start_x), int(start_y)), phys_surf, vis_surf, checkpoints
