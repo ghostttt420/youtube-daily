@@ -4,20 +4,20 @@ on:
   schedule:
     # Runs at 9:00 AM, 3:00 PM, 9:00 PM (UTC approx)
     - cron: '0 9,15,21 * * *'
-  workflow_dispatch: # Allows manual run button
+  workflow_dispatch: # Allows manual trigger button
 
 jobs:
   run_evolution:
     runs-on: ubuntu-latest
 
     env:
-      # Tell Pygame to run without a monitor
+      # CRITICAL: Tells Pygame to run without a monitor
       SDL_VIDEODRIVER: dummy 
-      # Your Secrets
+      # Secrets for YouTube Upload
       YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
       YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
-      # MoviePy ImageMagick configuration (sometimes needed on Linux)
+      # Helper for MoviePy on Linux
       IMAGEMAGICK_BINARY: /usr/bin/convert
 
     steps:
@@ -30,13 +30,13 @@ jobs:
           python-version: '3.10'
 
       - name: Install System Dependencies
-        # Added imagemagick here (Required for TextClip)
+        # Installs FFmpeg (Video), SDL (Pygame), ImageMagick (Text Overlay)
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg libsdl2-dev imagemagick
 
       - name: Fix ImageMagick Policy
-        # On Linux, ImageMagick disables PDF/Text by default for security. We must unblock it.
+        # Security fix to allow MoviePy to write text on video
         run: |
           sudo sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml
 
@@ -45,13 +45,28 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Simulation & Training
+      # --- PHASE 4: ASSET GENERATION ---
+      # This creates the F1 car images before the brain starts
+      - name: Generate Game Assets
+        run: python assets.py
+
+      # --- SIMULATION ---
+      # Runs the NEAT algorithm and saves clips to 'training_clips/'
+      - name: Run Simulation
         run: python ai_brain.py
 
+      # --- DEBUG STEP ---
+      # Lists files to ensure simulation worked
+      - name: Verify Clips
+        run: ls -R training_clips/ || echo "Directory not found"
+
+      # --- RENDER & UPLOAD ---
+      # Stitches clips, adds music, and uploads to YouTube
       - name: Edit & Upload Video
         run: python final_render.py
 
-      - name: Upload Video Artifact
+      - name: Upload Artifact
+        # Saves the video to GitHub interface for you to download manually if needed
         if: always()
         uses: actions/upload-artifact@v4
         with:
