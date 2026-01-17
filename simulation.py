@@ -10,6 +10,11 @@ WORLD_SIZE = 4000
 SENSOR_LENGTH = 300
 FPS = 30 
 
+# --- VISUAL CONSTANTS (Restored for ai_brain.py) ---
+# These are used by the brain script for the HUD and background clearing
+COL_BG = (30, 35, 30)      # Dark Grass
+COL_WALL = (200, 0, 0)     # Red (High contrast for text)
+
 # --- ASSET LOADING HELPER ---
 def load_sprite(filename, scale_size=None):
     """Safely loads assets, creating a placeholder if missing."""
@@ -73,8 +78,6 @@ class Car:
         self.velocity *= self.friction
         
         # Acceleration Vector
-        # We rotate 0 degrees (Right) by our angle. 
-        # Note: We don't use -90 here because math.cos/sin expect standard circle angles
         rad = math.radians(self.angle)
         accel_vec = pygame.math.Vector2(math.cos(rad), math.sin(rad)) * self.acceleration
         self.velocity += accel_vec
@@ -92,13 +95,8 @@ class Car:
             # --- SKID MARK GENERATOR ---
             # If turning hard while moving fast -> Drop skid marks
             if abs(self.steering) > 0.5 and self.velocity.length() > 15:
-                # Calculate wheel positions (Offset from center)
-                # Left Wheel
                 offset_l = pygame.math.Vector2(-15, -20).rotate(self.angle)
-                # Right Wheel
                 offset_r = pygame.math.Vector2(-15, 20).rotate(self.angle)
-                
-                # Add to skid list: (Position Vector, Life_Span)
                 self.skid_marks.append([self.position + offset_l, 20]) 
                 self.skid_marks.append([self.position + offset_r, 20])
 
@@ -143,7 +141,6 @@ class Car:
 
     def draw(self, screen, camera):
         # 1. Draw Skid Marks (Under everything)
-        # We iterate backwards to safely remove dead skids
         for i in range(len(self.skid_marks) - 1, -1, -1):
             pos, life = self.skid_marks[i]
             life -= 1
@@ -152,8 +149,6 @@ class Car:
             if life <= 0:
                 self.skid_marks.pop(i)
             else:
-                # Fade out logic could go here, but simple logic:
-                # Draw dark grey circle
                 adj_pos = camera.apply_point(pos)
                 pygame.draw.circle(screen, (30, 30, 30), adj_pos, 4)
 
@@ -163,8 +158,6 @@ class Car:
         img = self.sprite_leader if self.is_leader else self.sprite_norm
         
         # 3. Rotation
-        # Pygame rotates CCW. Our angle is standard CW/CCW math. 
-        # We offset by -90 because the sprite draws pointing UP.
         rotated_img = pygame.transform.rotate(img, -self.angle - 90)
         rotated_shadow = pygame.transform.rotate(self.shadow_surf, -self.angle - 90)
         
@@ -217,8 +210,8 @@ class TrackGenerator:
         
         # Physics: Black = Wall
         phys_surf.fill((0,0,0)) 
-        # Visual: Dark Grass
-        vis_surf.fill((30, 35, 30)) 
+        # Visual: Dark Grass (Matches COL_BG)
+        vis_surf.fill(COL_BG) 
         
         # --- SPLINE GENERATION ---
         points = []
