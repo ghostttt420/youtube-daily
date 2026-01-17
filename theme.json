@@ -1,37 +1,37 @@
 {
-    "theme_key": "CIRCUIT",
-    "map_seed": 799458,
+    "theme_key": "DESERT",
+    "map_seed": 823425,
     "physics": {
-        "friction": 0.97
+        "friction": 0.96
     },
     "visuals": {
         "bg": [
-            30,
-            35,
-            30
+            180,
+            80,
+            40
         ],
         "road": [
-            50,
-            50,
-            55
+            210,
+            150,
+            100
         ],
         "wall": [
-            200,
-            0,
-            0
+            100,
+            50,
+            20
         ],
         "center": [
-            80,
-            80,
+            180,
+            120,
             80
         ]
     },
     "meta": {
-        "title": "AI Learns to Race F1 Style \ud83c\udfce\ufe0f (Gen {gen})",
+        "title": "AI Rallies on MARS \ud83d\ude80 (Gen {gen})",
         "tags": [
-            "f1",
-            "racing",
-            "motorsport"
+            "rally",
+            "offroad",
+            "mars"
         ]
     }
 }
