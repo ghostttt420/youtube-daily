@@ -2,22 +2,20 @@ name: Project Evolution Daily
 
 on:
   schedule:
-    # Runs at 9:00 AM, 3:00 PM, 9:00 PM (UTC approx)
     - cron: '0 9,15,21 * * *'
-  workflow_dispatch: # Allows manual run button
+  workflow_dispatch:
 
 jobs:
   run_evolution:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # CRITICAL: Allows bot to push changes (save brains)
 
     env:
-      # Tell Pygame to run without a monitor
       SDL_VIDEODRIVER: dummy 
-      # Your Secrets
       YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
       YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
-      # MoviePy ImageMagick configuration (sometimes needed on Linux)
       IMAGEMAGICK_BINARY: /usr/bin/convert
 
     steps:
@@ -29,31 +27,46 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install System Dependencies
-        # Added imagemagick here (Required for TextClip)
+      - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg libsdl2-dev imagemagick
-
-      - name: Fix ImageMagick Policy
-        # On Linux, ImageMagick disables PDF/Text by default for security. We must unblock it.
-        run: |
           sudo sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml
-
-      - name: Install Python Libraries
-        run: |
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Simulation & Training
+      # 1. GENERATE THEME (Colors/Physics)
+      - name: Daily Config
+        run: python daily_config.py
+
+      # 2. PAINT ASSETS (Based on Theme)
+      - name: Generate Assets
+        run: python assets.py
+
+      - name: WIPE OLD MEMORY (Hard Reset)
+        run: rm -f neat-checkpoint-* best.pickle theme.json
+
+
+      # 3. EVOLVE (Reads checkpoints, runs sim)
+      - name: Run Simulation
         run: python ai_brain.py
 
-      - name: Edit & Upload Video
+      # 4. RENDER & UPLOAD
+      - name: Edit & Upload
         run: python final_render.py
 
-      - name: Upload Video Artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: daily-evolution-video
-          path: evolution_short.mp4
+      # 5. PERSISTENCE (Save the Brain!)
+      - name: Save Brain Progress
+        run: |
+          git config --global user.name "Auto-Evolution Bot"
+          git config --global user.email "bot@factghost.com"
+          
+          # Add new checkpoints and theme
+          git add neat-checkpoint-*
+          git add theme.json
+          
+          # Clean up old clips to keep repo light (optional but recommended)
+          # git rm training_clips/*.mp4 --ignore-unmatch
+          
+          git commit -m "🧠 Brain Evolution: Gen Update [skip ci]" || echo "No changes to commit"
+          git push
