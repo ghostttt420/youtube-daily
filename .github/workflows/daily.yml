@@ -69,7 +69,8 @@ jobs:
 
 
  - name: Upload Video Artifact
-        if: always() # Run even if the YouTube upload failed
+        if: always() 
+        # Run even if the YouTube upload failed
         uses: actions/upload-artifact@v4
         with:
           name: ai-evolution-video
