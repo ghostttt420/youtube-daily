@@ -10,16 +10,7 @@ try:
     with open("theme.json", "r") as f:
         THEME = json.load(f)
 except:
-    THEME = {
-        "map_seed": 42,
-        "physics": {"friction": 0.97}, 
-        "visuals": {
-            "bg": [30,35,30], 
-            "wall":[200,0,0], 
-            "road":[50,50,55], 
-            "center":[80,80,80]
-        }
-    }
+    THEME = {"map_seed": 42, "physics": {"friction": 0.97}, "visuals": {"bg": [30,35,30], "wall":[200,0,0], "road":[50,50,55], "center":[80,80,80]}}
 
 WIDTH, HEIGHT = 1080, 1920
 WORLD_SIZE = 4000
@@ -43,11 +34,7 @@ class Car:
     def __init__(self, start_pos, start_angle):
         self.position = pygame.math.Vector2(start_pos)
         self.velocity = pygame.math.Vector2(0, 0)
-        
-        # FIX: Start facing the road direction!
-        # Pygame 0 degrees is Right. We adjust inputs to match.
         self.angle = start_angle 
-        
         self.acceleration = 0.0
         self.steering = 0.0
         
@@ -61,7 +48,6 @@ class Car:
         self.distance_traveled = 0 
         self.is_leader = False
         
-        # Gates logic
         self.gates_passed = 0
         self.next_gate_idx = 0
         self.frames_since_gate = 0
@@ -72,6 +58,40 @@ class Car:
         pygame.draw.ellipse(self.shadow_surf, (0, 0, 0, 80), (0, 0, 50, 85))
         self.skid_marks = [] 
         self.rect = self.sprite_norm.get_rect(center=self.position)
+
+    def get_data(self, checkpoints):
+        """
+        Returns the GPS data for the AI input.
+        1. Angle to next gate (Normalized -1 to 1)
+        2. Distance to next gate (Normalized)
+        """
+        if not self.alive: return [0, 0]
+        
+        target_idx = self.next_gate_idx % len(checkpoints)
+        target_pos = pygame.math.Vector2(checkpoints[target_idx])
+        
+        # 1. Calculate Angle to Target
+        dx = target_pos.x - self.position.x
+        dy = target_pos.y - self.position.y
+        target_rad = math.atan2(dy, dx)
+        
+        # Car angle in radians
+        car_rad = math.radians(self.angle)
+        
+        # Relative angle (Delta)
+        diff = target_rad - car_rad
+        # Normalize to -PI to +PI
+        while diff > math.pi: diff -= 2 * math.pi
+        while diff < -math.pi: diff += 2 * math.pi
+        
+        # Input 1: Heading (-1.0 to 1.0)
+        heading_input = diff / math.pi
+        
+        # Input 2: Distance (Normalized by arbitrary max distance)
+        dist = self.position.distance_to(target_pos)
+        dist_input = min(dist / 1000.0, 1.0)
+        
+        return [heading_input, dist_input]
 
     def input_steer(self, left=False, right=False):
         if left: self.steering = -1
@@ -85,9 +105,9 @@ class Car:
         
         target_idx = self.next_gate_idx % len(checkpoints)
         target_pos = pygame.math.Vector2(checkpoints[target_idx])
-        
         distance = self.position.distance_to(target_pos)
         
+        # Hit radius (User wanted strictness, but let's keep it generous for learning)
         if distance < 300:
             self.gates_passed += 1
             self.next_gate_idx += 1
@@ -95,35 +115,12 @@ class Car:
             return True
         return False
 
-    def get_heading_reward(self, checkpoints):
-        """
-        Returns a score (0.0 to 1.0) based on if the car is 
-        pointing at the next gate.
-        """
-        if not self.alive: return 0
-        
-        target_idx = self.next_gate_idx % len(checkpoints)
-        target_pos = pygame.math.Vector2(checkpoints[target_idx])
-        
-        # Vector to target
-        to_target = target_pos - self.position
-        if to_target.length() == 0: return 0
-        to_target = to_target.normalize()
-        
-        # Car direction vector
-        rad = math.radians(self.angle)
-        car_dir = pygame.math.Vector2(math.cos(rad), math.sin(rad))
-        
-        # Dot product: 1.0 means facing directly at it. -1.0 means opposite.
-        dot = car_dir.dot(to_target)
-        return dot
-
     def update(self, map_mask):
         if not self.alive: return
 
+        # Strict Death Timer: 3 seconds (90 frames)
         self.frames_since_gate += 1
-        # Increased timeout to 10s (300 frames) to prevent early video cuts
-        if self.frames_since_gate > 300:
+        if self.frames_since_gate > 90:
             self.alive = False
             return
 
@@ -248,12 +245,12 @@ class TrackGenerator:
             x_new, y_new = splev(u_new, tck, der=0)
             smooth_points = list(zip(x_new, y_new))
             
-            checkpoints = smooth_points[::50]
+            # --- USER REQUEST: MORE SPACES ---
+            # Changed from 50 to 70 for wider gaps between gates
+            checkpoints = smooth_points[::70]
             
-            # --- FIX: CALCULATE START ANGLE ---
-            # Look at the first two points to determine direction
             p0 = smooth_points[0]
-            p1 = smooth_points[5] # Look ahead slightly
+            p1 = smooth_points[5]
             dx = p1[0] - p0[0]
             dy = p1[1] - p0[1]
             start_angle = math.degrees(math.atan2(dy, dx))
@@ -273,5 +270,4 @@ class TrackGenerator:
             pygame.draw.circle(vis_surf, (255, 255, 255), (int(p[0]), int(p[1])), 10)
 
         start_x, start_y = x_new[0], y_new[0]
-        # Return start_angle too!
         return (int(start_x), int(start_y)), phys_surf, vis_surf, checkpoints, start_angle
