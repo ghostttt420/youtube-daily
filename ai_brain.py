@@ -28,7 +28,7 @@ except:
     THEME = {"map_seed": 42}
 
 def create_config_file():
-    # --- ADDED ALL MISSING MUTATION PARAMETERS ---
+    # --- THE COMPLETE, BULLETPROOF CONFIG ---
     config_content = """
 [NEAT]
 fitness_criterion     = max
@@ -38,27 +38,41 @@ reset_on_extinction   = False
 no_fitness_termination = False
 
 [DefaultGenome]
+# Node activation options
 activation_default      = tanh
 activation_mutate_rate  = 0.0
 activation_options      = tanh
+
+# Node aggregation options
 aggregation_default     = sum
 aggregation_mutate_rate = 0.0
 aggregation_options     = sum
+
+# Structural mutation rates
 bias_init_mean          = 0.0
 bias_init_stdev         = 1.0
 bias_max_value          = 30.0
 bias_min_value          = -30.0
 bias_mutate_power       = 0.5
 bias_replace_rate       = 0.1
+# REQUIRED INIT TYPES (The missing fix)
+bias_init_type          = gaussian
+
+# Connection mutation rates
 conn_add_prob           = 0.5
 conn_delete_prob        = 0.5
 enabled_default         = True
 enabled_mutate_rate     = 0.01
+
 feed_forward            = True
 initial_connection      = full
+
+# Network Parameters
 num_hidden              = 0
 num_inputs              = 7 
 num_outputs             = 2
+
+# Node mutation rates
 node_add_prob           = 0.2
 node_delete_prob        = 0.2
 response_init_mean      = 1.0
@@ -67,18 +81,23 @@ response_max_value      = 30.0
 response_min_value      = -30.0
 response_mutate_power   = 0.0
 response_replace_rate   = 0.0
+# REQUIRED INIT TYPES
+response_init_type      = gaussian
+
 weight_init_mean        = 0.0
 weight_init_stdev       = 1.0
 weight_max_value        = 30
 weight_min_value        = -30
 weight_mutate_power     = 0.5
 weight_replace_rate     = 0.1
+# REQUIRED INIT TYPES
+weight_init_type        = gaussian
 
 # COMPATIBILITY COEFFICIENTS
 compatibility_disjoint_coefficient = 1.0
 compatibility_weight_coefficient   = 0.5
 
-# STRUCTURAL MUTATION FLAGS (The missing pieces)
+# STRUCTURAL MUTATION FLAGS
 single_structural_mutation = False
 structural_mutation_surer  = default
 
@@ -225,7 +244,7 @@ def run_simulation(genomes, config):
             dist_score = 1.0 - gps[1] 
             ge[i].fitness += dist_score * 0.1
 
-            # --- RELAXED TIMER ---
+            # --- RELAXED TIMER (15s) ---
             if not car.alive and car.frames_since_gate > 450:
                  ge[i].fitness -= 20
 
