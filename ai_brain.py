@@ -28,13 +28,14 @@ except:
     THEME = {"map_seed": 42}
 
 def create_config_file():
-    # ... (Same Config Content as before) ...
+    # --- ADDED 'no_fitness_termination' TO FIX CRASH ---
     config_content = """
 [NEAT]
 fitness_criterion     = max
 fitness_threshold     = 100000
 pop_size              = 20
 reset_on_extinction   = False
+no_fitness_termination = False 
 
 [DefaultGenome]
 activation_default      = tanh
@@ -182,7 +183,7 @@ def run_simulation(genomes, config):
 
     while running and len(cars) > 0:
         frame_count += 1
-        # Max Duration is now set to full 60s frames
+        # Max Duration set to 60s
         if frame_count > MAX_FRAMES: break
 
         for event in pygame.event.get():
@@ -195,6 +196,7 @@ def run_simulation(genomes, config):
         for i, car in enumerate(cars):
             if not car.alive: continue
             
+            # --- INPUTS ---
             if len(car.radars) < 5: inputs = [0] * 5
             else: inputs = [d[1] / simulation.SENSOR_LENGTH for d in car.radars]
             
@@ -217,8 +219,6 @@ def run_simulation(genomes, config):
             ge[i].fitness += dist_score * 0.1
 
             # --- RELAXED TIMER ---
-            # 450 frames = 15 seconds. 
-            # If they don't hit a gate in 15s, THEN they die.
             if not car.alive and car.frames_since_gate > 450:
                  ge[i].fitness -= 20
 
