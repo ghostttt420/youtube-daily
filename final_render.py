@@ -32,21 +32,19 @@ def make_video():
     
     if not os.path.exists(CLIPS_DIR):
         print(f"❌ Error: Directory '{CLIPS_DIR}' not found.")
-        return None
+        return None, 0
 
     files = [f for f in os.listdir(CLIPS_DIR) if f.endswith(".mp4")]
     if not files:
         print("❌ Error: No .mp4 files found.")
-        return None
+        return None, 0
 
-    # Sort files naturally: gen_00, gen_05, gen_10...
     files.sort()
-    
-    # USE ALL FILES (Not just first and last)
     selected_files = files 
-    print(f"🎞️ Stitching {len(selected_files)} clips: {selected_files}")
+    print(f"🎞️ Stitching {len(selected_files)} clips...")
     
     clips = []
+    last_gen_num = 0
     
     for i, filename in enumerate(selected_files):
         path = os.path.join(CLIPS_DIR, filename)
@@ -54,32 +52,24 @@ def make_video():
         
         if clip.w > 1080: clip = clip.resize(width=1080)
         
-        # Get Gen Number
         try:
-            # Filename is gen_05.mp4 -> 5
             gen_num = int(filename.split('_')[1].split('.')[0])
+            if i == len(selected_files) - 1: last_gen_num = gen_num
         except: gen_num = 0
         
-        # --- NARRATIVE LOGIC ---
         if i == 0:
             label = "Gen 0: NOOB 🤡"
             color = 'red'
-            # Gen 0: Force 5 seconds max
             if clip.duration > 5: clip = clip.subclip(0, 5)
-            
         elif i == len(selected_files) - 1:
             label = f"Gen {gen_num}: PRO 🏎️"
             color = '#00FF41'
-            # Final Gen: Keep it long, we want to see the finish
-            
         else:
             label = f"Gen {gen_num}: Learning... 🧠"
             color = 'yellow'
-            # Intermediate clips: Speed up to 5s max if they are long
             if clip.duration > 5: clip = clip.subclip(0, 5)
 
         try:
-            # Add Text Overlay
             txt = TextClip(label, fontsize=80, color=color, font='DejaVu-Sans-Bold', stroke_color='black', stroke_width=3).set_position(('center', 200)).set_duration(clip.duration)
             comp = CompositeVideoClip([clip, txt])
             clips.append(comp)
@@ -87,21 +77,18 @@ def make_video():
             clips.append(clip)
 
     final_video = concatenate_videoclips(clips, method="compose")
-    print(f"⏱️ Raw Stitch Duration: {final_video.duration} seconds")
     
-    # --- ELASTIC TIME (GUARANTEE 59s) ---
+    # ELASTIC TIME
     target_duration = 59.0
-    
-    # Calculate Ratio
-    ratio = final_video.duration / target_duration
-    
-    # If video is 30s, Ratio is 0.5. We need to slow down (0.5x speed).
-    # If video is 90s, Ratio is 1.5. We need to speed up (1.5x speed).
-    
-    print(f"⚖️ Adjusting speed by factor {ratio:.2f}x to hit 59s")
-    final_video = final_video.fx(vfx.speedx, ratio)
+    if final_video.duration > 60.0:
+        ratio = final_video.duration / target_duration
+        print(f"⚡ Speeding up by {ratio:.2f}x")
+        final_video = final_video.fx(vfx.speedx, ratio)
+    elif final_video.duration < 50.0:
+        ratio = final_video.duration / target_duration
+        print(f"🐢 Slowing down by {ratio:.2f}x")
+        final_video = final_video.fx(vfx.speedx, ratio)
 
-    # Add Music
     if os.path.exists(MUSIC_FILE):
         music = AudioFileClip(MUSIC_FILE)
         if music.duration < final_video.duration:
@@ -112,14 +99,25 @@ def make_video():
         final_video = final_video.set_audio(music)
 
     final_video.write_videofile(OUTPUT_FILE, fps=30, codec='libx264', audio_codec='aac', preset='fast', logger=None)
-    return OUTPUT_FILE
+    return OUTPUT_FILE, last_gen_num
 
-def upload_video():
+def upload_video(last_gen):
     print("🚀 Uploading...")
     try:
         creds = Credentials(None, refresh_token=os.environ["YT_REFRESH_TOKEN"], token_uri="https://oauth2.googleapis.com/token", client_id=os.environ["YT_CLIENT_ID"], client_secret=os.environ["YT_CLIENT_SECRET"])
         youtube = build("youtube", "v3", credentials=creds)
-        title = f"{THEME['meta']['title']} #shorts"
+        
+        # --- TITLE FIX LOGIC ---
+        raw_title = THEME['meta']['title']
+        # If title has placeholder, replace it. If not, append it.
+        if "{gen}" in raw_title:
+            clean_title = raw_title.replace("{gen}", str(last_gen))
+        else:
+            clean_title = f"{raw_title} (Gen {last_gen})"
+            
+        title = f"{clean_title} #shorts"
+        # -----------------------
+
         description = "Evolutionary AI learns to race.\n#machinelearning #python #ai"
         request = youtube.videos().insert(part="snippet,status", body={"snippet": {"title": title, "description": description, "tags": THEME['meta']['tags'], "categoryId": "28"}, "status": { "privacyStatus": "public" }}, media_body=MediaFileUpload(OUTPUT_FILE))
         response = request.execute()
@@ -128,5 +126,6 @@ def upload_video():
         print(f"❌ Upload Failed: {e}")
 
 if __name__ == "__main__":
-    if make_video():
-        upload_video()
+    output_path, generation_count = make_video()
+    if output_path:
+        upload_video(generation_count)
