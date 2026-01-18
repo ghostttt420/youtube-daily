@@ -28,14 +28,14 @@ except:
     THEME = {"map_seed": 42}
 
 def create_config_file():
-    # --- ADDED 'no_fitness_termination' TO FIX CRASH ---
+    # --- ADDED MISSING COMPATIBILITY COEFFICIENTS ---
     config_content = """
 [NEAT]
 fitness_criterion     = max
 fitness_threshold     = 100000
 pop_size              = 20
 reset_on_extinction   = False
-no_fitness_termination = False 
+no_fitness_termination = False
 
 [DefaultGenome]
 activation_default      = tanh
@@ -73,6 +73,10 @@ weight_max_value        = 30
 weight_min_value        = -30
 weight_mutate_power     = 0.5
 weight_replace_rate     = 0.1
+
+# These were missing and caused the crash:
+compatibility_disjoint_coefficient = 1.0
+compatibility_weight_coefficient   = 0.5
 
 [DefaultSpeciesSet]
 compatibility_threshold = 3.0
