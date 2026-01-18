@@ -40,10 +40,14 @@ def load_sprite(filename, scale_size=None):
     return img
 
 class Car:
-    def __init__(self, start_pos):
+    def __init__(self, start_pos, start_angle):
         self.position = pygame.math.Vector2(start_pos)
         self.velocity = pygame.math.Vector2(0, 0)
-        self.angle = -90 
+        
+        # FIX: Start facing the road direction!
+        # Pygame 0 degrees is Right. We adjust inputs to match.
+        self.angle = start_angle 
+        
         self.acceleration = 0.0
         self.steering = 0.0
         
@@ -57,10 +61,10 @@ class Car:
         self.distance_traveled = 0 
         self.is_leader = False
         
-        # --- NEW: ANTI-SPIN LOGIC ---
+        # Gates logic
         self.gates_passed = 0
         self.next_gate_idx = 0
-        self.frames_since_gate = 0 # The Ticking Clock
+        self.frames_since_gate = 0
         
         self.sprite_norm = load_sprite("car_normal.png", (50, 85))
         self.sprite_leader = load_sprite("car_leader.png", (50, 85))
@@ -79,28 +83,47 @@ class Car:
     def check_gates(self, checkpoints):
         if not self.alive: return False
         
-        # Determine target gate
         target_idx = self.next_gate_idx % len(checkpoints)
         target_pos = pygame.math.Vector2(checkpoints[target_idx])
         
         distance = self.position.distance_to(target_pos)
         
-        # Gate Hit Radius (300px is generous to encourage them)
         if distance < 300:
             self.gates_passed += 1
             self.next_gate_idx += 1
-            self.frames_since_gate = 0 # RESET TIMER ON SUCCESS
+            self.frames_since_gate = 0 
             return True
         return False
+
+    def get_heading_reward(self, checkpoints):
+        """
+        Returns a score (0.0 to 1.0) based on if the car is 
+        pointing at the next gate.
+        """
+        if not self.alive: return 0
+        
+        target_idx = self.next_gate_idx % len(checkpoints)
+        target_pos = pygame.math.Vector2(checkpoints[target_idx])
+        
+        # Vector to target
+        to_target = target_pos - self.position
+        if to_target.length() == 0: return 0
+        to_target = to_target.normalize()
+        
+        # Car direction vector
+        rad = math.radians(self.angle)
+        car_dir = pygame.math.Vector2(math.cos(rad), math.sin(rad))
+        
+        # Dot product: 1.0 means facing directly at it. -1.0 means opposite.
+        dot = car_dir.dot(to_target)
+        return dot
 
     def update(self, map_mask):
         if not self.alive: return
 
-        # --- THE TICKING CLOCK ---
         self.frames_since_gate += 1
-        # If you haven't hit a gate in 5 seconds (150 frames), YOU DIE.
-        # This kills "donuts" immediately.
-        if self.frames_since_gate > 150:
+        # Increased timeout to 10s (300 frames) to prevent early video cuts
+        if self.frames_since_gate > 300:
             self.alive = False
             return
 
@@ -225,23 +248,30 @@ class TrackGenerator:
             x_new, y_new = splev(u_new, tck, der=0)
             smooth_points = list(zip(x_new, y_new))
             
-            # --- CHECKPOINTS EVERY 50 POINTS ---
-            checkpoints = smooth_points[::50] 
+            checkpoints = smooth_points[::50]
+            
+            # --- FIX: CALCULATE START ANGLE ---
+            # Look at the first two points to determine direction
+            p0 = smooth_points[0]
+            p1 = smooth_points[5] # Look ahead slightly
+            dx = p1[0] - p0[0]
+            dy = p1[1] - p0[1]
+            start_angle = math.degrees(math.atan2(dy, dx))
+            
         except:
             smooth_points = points
             checkpoints = points
+            start_angle = -90
 
         pygame.draw.lines(phys_surf, (255, 255, 255), True, smooth_points, 450) 
-        
         pygame.draw.lines(vis_surf, THEME["visuals"]["wall"], True, smooth_points, 480) 
         pygame.draw.lines(vis_surf, (220, 220, 220), True, smooth_points, 450) 
         pygame.draw.lines(vis_surf, THEME["visuals"]["road"], True, smooth_points, 420) 
         pygame.draw.lines(vis_surf, THEME["visuals"]["center"], True, smooth_points, 4)
         
-        # --- DRAW CHECKPOINTS (VISUAL DEBUG) ---
-        # We draw white circles so you can SEE the gates
         for p in checkpoints:
             pygame.draw.circle(vis_surf, (255, 255, 255), (int(p[0]), int(p[1])), 10)
 
         start_x, start_y = x_new[0], y_new[0]
-        return (int(start_x), int(start_y)), phys_surf, vis_surf, checkpoints
+        # Return start_angle too!
+        return (int(start_x), int(start_y)), phys_surf, vis_surf, checkpoints, start_angle
