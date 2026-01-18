@@ -31,12 +31,14 @@ def run_dummy_generation():
     pygame.init()
     screen = pygame.display.set_mode((simulation.WIDTH, simulation.HEIGHT))
     
+    # UNPACK start_angle
     map_gen = simulation.TrackGenerator(seed=THEME["map_seed"])
-    start_pos, track_surface, visual_map, checkpoints = map_gen.generate_track()
+    start_pos, track_surface, visual_map, checkpoints, start_angle = map_gen.generate_track()
     map_mask = pygame.mask.from_surface(track_surface)
     camera = simulation.Camera(simulation.WORLD_SIZE, simulation.WORLD_SIZE)
 
-    cars = [simulation.Car(start_pos) for _ in range(20)]
+    # USE start_angle
+    cars = [simulation.Car(start_pos, start_angle) for _ in range(20)]
     
     video_path = os.path.join(VIDEO_OUTPUT_DIR, "gen_0.mp4")
     writer = imageio.get_writer(video_path, fps=FPS)
@@ -95,14 +97,14 @@ def run_simulation(genomes, config):
     screen = pygame.display.set_mode((simulation.WIDTH, simulation.HEIGHT))
     
     map_gen = simulation.TrackGenerator(seed=THEME["map_seed"])
-    start_pos, track_surface, visual_map, checkpoints = map_gen.generate_track()
+    start_pos, track_surface, visual_map, checkpoints, start_angle = map_gen.generate_track()
     map_mask = pygame.mask.from_surface(track_surface)
     camera = simulation.Camera(simulation.WORLD_SIZE, simulation.WORLD_SIZE)
 
     for _, g in genomes:
         net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
-        cars.append(simulation.Car(start_pos)) 
+        cars.append(simulation.Car(start_pos, start_angle)) 
         g.fitness = 0
         ge.append(g)
 
@@ -111,7 +113,7 @@ def run_simulation(genomes, config):
     should_record = (GENERATION == MAX_GENERATIONS)
     
     if should_record:
-        print(f"🎥 Recording Gen {GENERATION}...")
+        print(f"🎥 Recording Gen {GENERATION} (The Pro Run)...")
         writer = imageio.get_writer(video_path, fps=FPS)
 
     running = True
@@ -125,7 +127,6 @@ def run_simulation(genomes, config):
         for event in pygame.event.get():
             if event.type == pygame.QUIT: sys.exit()
 
-        # Camera follows whoever passed the most gates
         leader = max(cars, key=lambda c: c.gates_passed * 1000 + c.distance_traveled)
         camera.update(leader)
         for c in cars: c.is_leader = (c == leader)
@@ -144,22 +145,22 @@ def run_simulation(genomes, config):
             car.update(map_mask)
             car.check_radar(map_mask)
             
-            # --- STRICT FITNESS (NO FREE POINTS) ---
+            # --- COMPASS FITNESS (NO SPINNING) ---
             # 1. Huge Reward for Gates
             if car.check_gates(checkpoints):
                 ge[i].fitness += 500
                 
-            # 2. NO SPEED REWARD. NONE. 
-            # This fixes the donuts. Spinning = 0 points.
+            # 2. "Compass" Reward
+            # If you look at the white dot, you get points.
+            # If you spin away from it, you get negative points.
+            ge[i].fitness += car.get_heading_reward(checkpoints) * 2.0
             
-            # 3. Penalty for Stagnation happens inside car.update()
-            # If they die from timeout, we punish them slightly
-            if not car.alive and car.frames_since_gate > 150:
+            # 3. Penalty for Stagnation
+            if not car.alive and car.frames_since_gate > 300:
                  ge[i].fitness -= 50
 
         for i in range(len(cars) - 1, -1, -1):
             if not cars[i].alive:
-                # Standard Crash Penalty
                 ge[i].fitness -= 10 
                 cars.pop(i)
                 nets.pop(i)
