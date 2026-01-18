@@ -66,3 +66,11 @@ jobs:
           
           git commit -m "🧠 Brain Evolution: Gen Update [skip ci]" || echo "No changes to commit"
           git push
+
+
+ - name: Upload Video Artifact
+        if: always() # Run even if the YouTube upload failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-evolution-video
+          path: evolution_short.mp4
