@@ -1,37 +1,37 @@
 {
-    "theme_key": "NIGHT",
-    "map_seed": 594622,
+    "theme_key": "DESERT",
+    "map_seed": 984299,
     "physics": {
-        "friction": 0.98
+        "friction": 0.96
     },
     "visuals": {
         "bg": [
-            10,
-            0,
-            20
+            180,
+            80,
+            40
         ],
         "road": [
-            20,
-            20,
-            30
+            210,
+            150,
+            100
         ],
         "wall": [
-            0,
-            255,
-            255
+            100,
+            50,
+            20
         ],
         "center": [
-            255,
-            0,
-            128
+            180,
+            120,
+            80
         ]
     },
     "meta": {
-        "title": "AI Street Racing at NIGHT \ud83c\udf03 (Gen {gen})",
+        "title": "AI Rallies on MARS \ud83d\ude80 (Gen {gen})",
         "tags": [
-            "cyberpunk",
-            "neon",
-            "drift"
+            "rally",
+            "offroad",
+            "mars"
         ]
     }
 }
