@@ -14,11 +14,11 @@ import random
 import simulation 
 
 # CONFIG
-MAX_GENERATIONS = 30
+MAX_GENERATIONS = 50  # Increased for better learning
 VIDEO_OUTPUT_DIR = "training_clips"
 FPS = 30 
-MAX_FRAMES_PRO = 1800 # 60 seconds for the final run
-MAX_FRAMES_TRAINING = 450 # 15 seconds for intermediate training clips
+MAX_FRAMES_PRO = 1800 # 60s for final
+MAX_FRAMES_TRAINING = 300 # 10s for training clips
 
 if not os.path.exists(VIDEO_OUTPUT_DIR): os.makedirs(VIDEO_OUTPUT_DIR)
 
@@ -29,22 +29,22 @@ except:
     THEME = {"map_seed": 42}
 
 def clean_old_checkpoints():
-    print("🧹 Wiping old checkpoints and clips...")
-    # Delete checkpoints
+    print("🧹 Wiping old data for a fresh start...")
     for f in glob.glob("neat-checkpoint-*"):
         try: os.remove(f)
         except: pass
-    # Delete old videos so we don't mix them up
     for f in glob.glob(os.path.join(VIDEO_OUTPUT_DIR, "*.mp4")):
         try: os.remove(f)
         except: pass
 
 def create_config_file():
+    # --- STABILIZED CONFIGURATION ---
+    # Lower mutation rates = Better retention of skills
     config_content = """
 [NEAT]
 fitness_criterion     = max
 fitness_threshold     = 100000
-pop_size              = 20
+pop_size              = 40
 reset_on_extinction   = False
 no_fitness_termination = False
 
@@ -56,13 +56,14 @@ aggregation_default     = sum
 aggregation_mutate_rate = 0.0
 aggregation_options     = sum
 
+# --- STABILIZED MUTATION RATES (0.1 - 0.3) ---
 bias_init_mean          = 0.0
 bias_init_stdev         = 1.0
 bias_max_value          = 30.0
 bias_min_value          = -30.0
 bias_mutate_power       = 0.5
 bias_replace_rate       = 0.1
-bias_mutate_rate        = 0.7
+bias_mutate_rate        = 0.2
 bias_init_type          = gaussian
 
 response_init_mean      = 1.0
@@ -80,11 +81,11 @@ weight_max_value        = 30
 weight_min_value        = -30
 weight_mutate_power     = 0.5
 weight_replace_rate     = 0.1
-weight_mutate_rate      = 0.8
+weight_mutate_rate      = 0.3
 weight_init_type        = gaussian
 
-conn_add_prob           = 0.5
-conn_delete_prob        = 0.5
+conn_add_prob           = 0.3
+conn_delete_prob        = 0.3
 enabled_default         = True
 enabled_mutate_rate     = 0.01
 feed_forward            = True
@@ -93,12 +94,13 @@ initial_connection      = full
 enabled_rate_to_true_add = 0.0
 enabled_rate_to_false_add = 0.0
 
+# 5 Radars + 2 GPS = 7 Inputs
 num_hidden              = 0
 num_inputs              = 7 
 num_outputs             = 2
 
-node_add_prob           = 0.2
-node_delete_prob        = 0.2
+node_add_prob           = 0.1
+node_delete_prob        = 0.1
 
 compatibility_disjoint_coefficient = 1.0
 compatibility_weight_coefficient   = 0.5
@@ -132,9 +134,8 @@ def run_dummy_generation():
     map_mask = pygame.mask.from_surface(track_surface)
     camera = simulation.Camera(simulation.WORLD_SIZE, simulation.WORLD_SIZE)
 
-    cars = [simulation.Car(start_pos, start_angle) for _ in range(20)]
+    cars = [simulation.Car(start_pos, start_angle) for _ in range(40)] # Match pop size
     
-    # Force filename to sort first
     video_path = os.path.join(VIDEO_OUTPUT_DIR, "gen_00.mp4")
     writer = imageio.get_writer(video_path, fps=FPS)
 
@@ -182,7 +183,7 @@ def run_dummy_generation():
 def run_simulation(genomes, config):
     global GENERATION
     GENERATION += 1
-    print(f"\n--- 🏁 Gen {GENERATION} Start ---")
+    print(f"\n--- 🏁 Gen {GENERATION} / {MAX_GENERATIONS} ---")
 
     nets = []
     cars = []
@@ -204,11 +205,10 @@ def run_simulation(genomes, config):
         ge.append(g)
 
     writer = None
-    # RECORD EVERY 5th GENERATION + THE LAST ONE
-    should_record = (GENERATION % 5 == 0) or (GENERATION == MAX_GENERATIONS)
+    # RECORD EVERY 10th GENERATION (0, 10, 20, 30, 40, 50)
+    should_record = (GENERATION % 10 == 0) or (GENERATION == MAX_GENERATIONS)
     
     if should_record:
-        # Use padded numbers (05, 10) so they sort correctly
         filename = f"gen_{GENERATION:02d}.mp4"
         video_path = os.path.join(VIDEO_OUTPUT_DIR, filename)
         print(f"🎥 Recording Gen {GENERATION}...")
@@ -218,7 +218,6 @@ def run_simulation(genomes, config):
     frame_count = 0
     for car in cars: car.check_radar(map_mask)
     
-    # Determine allowed duration
     current_max_frames = MAX_FRAMES_PRO if (GENERATION == MAX_GENERATIONS) else MAX_FRAMES_TRAINING
 
     while running and len(cars) > 0:
@@ -235,7 +234,6 @@ def run_simulation(genomes, config):
         for i, car in enumerate(cars):
             if not car.alive: continue
             
-            # --- INPUTS ---
             if len(car.radars) < 5: inputs = [0] * 5
             else: inputs = [d[1] / simulation.SENSOR_LENGTH for d in car.radars]
             
@@ -250,20 +248,24 @@ def run_simulation(genomes, config):
             car.update(map_mask)
             car.check_radar(map_mask)
             
-            # --- FITNESS ---
+            # --- FITNESS TUNING ---
             if car.check_gates(checkpoints):
                 ge[i].fitness += 200
-                
+            
+            # Reduced GPS reward (0.05) so they focus more on surviving walls
             dist_score = 1.0 - gps[1] 
-            ge[i].fitness += dist_score * 0.1
+            ge[i].fitness += dist_score * 0.05
 
-            # --- RELAXED TIMER ---
+            # Higher Wall Penalty (-50)
+            if not car.alive:
+                 ge[i].fitness -= 50
+
+            # Stagnation timer (15s)
             if not car.alive and car.frames_since_gate > 450:
                  ge[i].fitness -= 20
 
         for i in range(len(cars) - 1, -1, -1):
             if not cars[i].alive:
-                ge[i].fitness -= 10 
                 cars.pop(i)
                 nets.pop(i)
                 ge.pop(i)
@@ -291,14 +293,14 @@ def run_simulation(genomes, config):
 def run_neat(config_path):
     global GENERATION
     GENERATION = 0
-    clean_old_checkpoints() # Clean start
+    clean_old_checkpoints() 
     run_dummy_generation()
     
     config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
                                 neat.DefaultSpeciesSet, neat.DefaultStagnation,
                                 config_path)
     
-    print("👶 STARTING EVOLUTION")
+    print("👶 STARTING EVOLUTION (Pop: 40, Gen: 50)")
     p = neat.Population(config)
     p.add_reporter(neat.StdOutReporter(True))
     p.add_reporter(neat.Checkpointer(generation_interval=5, filename_prefix="neat-checkpoint-"))
