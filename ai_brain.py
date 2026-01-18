@@ -31,13 +31,11 @@ def run_dummy_generation():
     pygame.init()
     screen = pygame.display.set_mode((simulation.WIDTH, simulation.HEIGHT))
     
-    # UNPACK start_angle
     map_gen = simulation.TrackGenerator(seed=THEME["map_seed"])
     start_pos, track_surface, visual_map, checkpoints, start_angle = map_gen.generate_track()
     map_mask = pygame.mask.from_surface(track_surface)
     camera = simulation.Camera(simulation.WORLD_SIZE, simulation.WORLD_SIZE)
 
-    # USE start_angle
     cars = [simulation.Car(start_pos, start_angle) for _ in range(20)]
     
     video_path = os.path.join(VIDEO_OUTPUT_DIR, "gen_0.mp4")
@@ -145,19 +143,28 @@ def run_simulation(genomes, config):
             car.update(map_mask)
             car.check_radar(map_mask)
             
-            # --- COMPASS FITNESS (NO SPINNING) ---
-            # 1. Huge Reward for Gates
-            if car.check_gates(checkpoints):
-                ge[i].fitness += 500
-                
-            # 2. "Compass" Reward
-            # If you look at the white dot, you get points.
-            # If you spin away from it, you get negative points.
-            ge[i].fitness += car.get_heading_reward(checkpoints) * 2.0
+            # --- THE "RACING" FIX ---
             
-            # 3. Penalty for Stagnation
-            if not car.alive and car.frames_since_gate > 300:
-                 ge[i].fitness -= 50
+            # 1. Gate Reward (Big Milestone)
+            if car.check_gates(checkpoints):
+                ge[i].fitness += 200
+                
+            # 2. Closing Velocity Reward (The Anti-Spin Math)
+            # Calculate vector to the next gate
+            target_gate = pygame.math.Vector2(checkpoints[car.next_gate_idx % len(checkpoints)])
+            to_gate = target_gate - car.position
+            if to_gate.length() > 0:
+                to_gate = to_gate.normalize()
+            
+            # Dot Product: How much of our speed is pointing AT the gate?
+            # If spinning/sideways, this is ~0. If driving to gate, this is high.
+            closing_speed = car.velocity.dot(to_gate)
+            ge[i].fitness += closing_speed * 1.5 
+            
+            # 3. Strict Death Timer (90 frames = 3 seconds)
+            # If you don't hit a gate in 3s, you are too slow. Die.
+            if not car.alive and car.frames_since_gate > 90:
+                 ge[i].fitness -= 20
 
         for i in range(len(cars) - 1, -1, -1):
             if not cars[i].alive:
