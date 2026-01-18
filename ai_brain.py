@@ -26,6 +26,68 @@ try:
 except:
     THEME = {"map_seed": 42}
 
+# --- GENERATE NEAT CONFIG DYNAMICALLY ---
+# Ensures 7 inputs (5 Radar + 2 GPS)
+def create_config_file():
+    config_content = """
+[NEAT]
+fitness_criterion     = max
+fitness_threshold     = 100000
+pop_size              = 20
+reset_on_extinction   = False
+
+[DefaultGenome]
+activation_default      = tanh
+activation_mutate_rate  = 0.0
+activation_options      = tanh
+aggregation_default     = sum
+aggregation_mutate_rate = 0.0
+aggregation_options     = sum
+bias_init_mean          = 0.0
+bias_init_stdev         = 1.0
+bias_max_value          = 30.0
+bias_min_value          = -30.0
+bias_mutate_power       = 0.5
+bias_replace_rate       = 0.1
+conn_add_prob           = 0.5
+conn_delete_prob        = 0.5
+enabled_default         = True
+enabled_mutate_rate     = 0.01
+feed_forward            = True
+initial_connection      = full
+num_hidden              = 0
+num_inputs              = 7 
+num_outputs             = 2
+node_add_prob           = 0.2
+node_delete_prob        = 0.2
+response_init_mean      = 1.0
+response_init_stdev     = 0.0
+response_max_value      = 30.0
+response_min_value      = -30.0
+response_mutate_power   = 0.0
+response_replace_rate   = 0.0
+weight_init_mean        = 0.0
+weight_init_stdev       = 1.0
+weight_max_value        = 30
+weight_min_value        = -30
+weight_mutate_power     = 0.5
+weight_replace_rate     = 0.1
+
+[DefaultSpeciesSet]
+compatibility_threshold = 3.0
+
+[DefaultStagnation]
+species_fitness_func = max
+max_stagnation       = 20
+species_elitism      = 2
+
+[DefaultReproduction]
+elitism            = 2
+survival_threshold = 0.2
+    """
+    with open("config.txt", "w") as f:
+        f.write(config_content)
+
 def run_dummy_generation():
     print("\n--- 🤡 Running Dummy Gen 0 ---")
     pygame.init()
@@ -132,8 +194,13 @@ def run_simulation(genomes, config):
         for i, car in enumerate(cars):
             if not car.alive: continue
             
+            # --- INPUTS ---
             if len(car.radars) < 5: inputs = [0] * 5
             else: inputs = [d[1] / simulation.SENSOR_LENGTH for d in car.radars]
+            
+            # GPS Data (THE FIX)
+            gps = car.get_data(checkpoints)
+            inputs.extend(gps)
 
             output = nets[i].activate(inputs)
             if output[0] > 0.5: car.input_steer(right=True)
@@ -143,27 +210,16 @@ def run_simulation(genomes, config):
             car.update(map_mask)
             car.check_radar(map_mask)
             
-            # --- THE "RACING" FIX ---
-            
-            # 1. Gate Reward (Big Milestone)
+            # --- FITNESS FUNCTION ---
             if car.check_gates(checkpoints):
                 ge[i].fitness += 200
                 
-            # 2. Closing Velocity Reward (The Anti-Spin Math)
-            # Calculate vector to the next gate
-            target_gate = pygame.math.Vector2(checkpoints[car.next_gate_idx % len(checkpoints)])
-            to_gate = target_gate - car.position
-            if to_gate.length() > 0:
-                to_gate = to_gate.normalize()
-            
-            # Dot Product: How much of our speed is pointing AT the gate?
-            # If spinning/sideways, this is ~0. If driving to gate, this is high.
-            closing_speed = car.velocity.dot(to_gate)
-            ge[i].fitness += closing_speed * 1.5 
-            
-            # 3. Strict Death Timer (90 frames = 3 seconds)
-            # If you don't hit a gate in 3s, you are too slow. Die.
-            if not car.alive and car.frames_since_gate > 90:
+            # Distance Reward (Pulls car to gate)
+            dist_score = 1.0 - gps[1] 
+            ge[i].fitness += dist_score * 0.1
+
+            # Relaxed Death Timer (180 frames = 6 seconds)
+            if not car.alive and car.frames_since_gate > 180:
                  ge[i].fitness -= 20
 
         for i in range(len(cars) - 1, -1, -1):
@@ -216,6 +272,7 @@ def run_neat(config_path):
     p.run(run_simulation, MAX_GENERATIONS)
 
 if __name__ == "__main__":
+    create_config_file()
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir, "config.txt")
     run_neat(config_path)
