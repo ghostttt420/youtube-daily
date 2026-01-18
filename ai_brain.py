@@ -16,7 +16,6 @@ import simulation
 MAX_GENERATIONS = 30
 VIDEO_OUTPUT_DIR = "training_clips"
 FPS = 30 
-# Max frames for the video = 60 seconds * 30 fps = 1800
 MAX_FRAMES = 1800 
 
 if not os.path.exists(VIDEO_OUTPUT_DIR): os.makedirs(VIDEO_OUTPUT_DIR)
@@ -28,8 +27,8 @@ except:
     THEME = {"map_seed": 42}
 
 def create_config_file():
-    # --- THE COMPLETE, EXHAUSTIVE CONFIGURATION ---
-    # Includes every single parameter to prevent runtime errors.
+    # --- THE NUCLEAR OPTION CONFIG ---
+    # Defines EVERY SINGLE parameter to stop the crashes.
     config_content = """
 [NEAT]
 fitness_criterion     = max
@@ -49,7 +48,7 @@ aggregation_default     = sum
 aggregation_mutate_rate = 0.0
 aggregation_options     = sum
 
-# --- BIAS PARAMETERS (The ones crashing before) ---
+# --- BIAS ---
 bias_init_mean          = 0.0
 bias_init_stdev         = 1.0
 bias_max_value          = 30.0
@@ -59,7 +58,7 @@ bias_replace_rate       = 0.1
 bias_mutate_rate        = 0.7
 bias_init_type          = gaussian
 
-# --- RESPONSE PARAMETERS ---
+# --- RESPONSE ---
 response_init_mean      = 1.0
 response_init_stdev     = 0.0
 response_max_value      = 30.0
@@ -69,7 +68,7 @@ response_replace_rate   = 0.0
 response_mutate_rate    = 0.0
 response_init_type      = gaussian
 
-# --- WEIGHT PARAMETERS ---
+# --- WEIGHT ---
 weight_init_mean        = 0.0
 weight_init_stdev       = 1.0
 weight_max_value        = 30
@@ -79,7 +78,7 @@ weight_replace_rate     = 0.1
 weight_mutate_rate      = 0.8
 weight_init_type        = gaussian
 
-# --- CONNECTION PARAMETERS ---
+# --- CONNECTION & ENABLED RATES (The Crash Fixers) ---
 conn_add_prob           = 0.5
 conn_delete_prob        = 0.5
 enabled_default         = True
@@ -87,8 +86,11 @@ enabled_mutate_rate     = 0.01
 feed_forward            = True
 initial_connection      = full
 
+# These are the specific new strict parameters:
+enabled_rate_to_true_add = 0.0
+enabled_rate_to_false_add = 0.0
+
 # --- NETWORK SHAPE ---
-# 5 Radars + 2 GPS = 7 Inputs
 num_hidden              = 0
 num_inputs              = 7 
 num_outputs             = 2
@@ -248,7 +250,7 @@ def run_simulation(genomes, config):
             dist_score = 1.0 - gps[1] 
             ge[i].fitness += dist_score * 0.1
 
-            # --- RELAXED TIMER (15s) ---
+            # --- RELAXED TIMER ---
             if not car.alive and car.frames_since_gate > 450:
                  ge[i].fitness -= 20
 
