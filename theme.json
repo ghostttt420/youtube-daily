@@ -1,37 +1,37 @@
 {
-    "theme_key": "CIRCUIT",
-    "map_seed": 728013,
+    "theme_key": "NIGHT",
+    "map_seed": 594622,
     "physics": {
-        "friction": 0.97
+        "friction": 0.98
     },
     "visuals": {
         "bg": [
-            30,
-            35,
-            30
+            10,
+            0,
+            20
         ],
         "road": [
-            50,
-            50,
-            55
+            20,
+            20,
+            30
         ],
         "wall": [
-            200,
             0,
-            0
+            255,
+            255
         ],
         "center": [
-            80,
-            80,
-            80
+            255,
+            0,
+            128
         ]
     },
     "meta": {
-        "title": "AI Learns to Race F1 Style \ud83c\udfce\ufe0f (Gen {gen})",
+        "title": "AI Street Racing at NIGHT \ud83c\udf03 (Gen {gen})",
         "tags": [
-            "f1",
-            "racing",
-            "motorsport"
+            "cyberpunk",
+            "neon",
+            "drift"
         ]
     }
 }
