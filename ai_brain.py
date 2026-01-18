@@ -16,7 +16,8 @@ import simulation
 MAX_GENERATIONS = 30
 VIDEO_OUTPUT_DIR = "training_clips"
 FPS = 30 
-MAX_FRAMES = FPS * 120 
+# Max frames for the video = 60 seconds * 30 fps = 1800
+MAX_FRAMES = 1800 
 
 if not os.path.exists(VIDEO_OUTPUT_DIR): os.makedirs(VIDEO_OUTPUT_DIR)
 
@@ -26,9 +27,8 @@ try:
 except:
     THEME = {"map_seed": 42}
 
-# --- GENERATE NEAT CONFIG DYNAMICALLY ---
-# Ensures 7 inputs (5 Radar + 2 GPS)
 def create_config_file():
+    # ... (Same Config Content as before) ...
     config_content = """
 [NEAT]
 fitness_criterion     = max
@@ -182,6 +182,7 @@ def run_simulation(genomes, config):
 
     while running and len(cars) > 0:
         frame_count += 1
+        # Max Duration is now set to full 60s frames
         if frame_count > MAX_FRAMES: break
 
         for event in pygame.event.get():
@@ -194,11 +195,9 @@ def run_simulation(genomes, config):
         for i, car in enumerate(cars):
             if not car.alive: continue
             
-            # --- INPUTS ---
             if len(car.radars) < 5: inputs = [0] * 5
             else: inputs = [d[1] / simulation.SENSOR_LENGTH for d in car.radars]
             
-            # GPS Data (THE FIX)
             gps = car.get_data(checkpoints)
             inputs.extend(gps)
 
@@ -210,16 +209,17 @@ def run_simulation(genomes, config):
             car.update(map_mask)
             car.check_radar(map_mask)
             
-            # --- FITNESS FUNCTION ---
+            # --- FITNESS ---
             if car.check_gates(checkpoints):
                 ge[i].fitness += 200
                 
-            # Distance Reward (Pulls car to gate)
             dist_score = 1.0 - gps[1] 
             ge[i].fitness += dist_score * 0.1
 
-            # Relaxed Death Timer (180 frames = 6 seconds)
-            if not car.alive and car.frames_since_gate > 180:
+            # --- RELAXED TIMER ---
+            # 450 frames = 15 seconds. 
+            # If they don't hit a gate in 15s, THEN they die.
+            if not car.alive and car.frames_since_gate > 450:
                  ge[i].fitness -= 20
 
         for i in range(len(cars) - 1, -1, -1):
