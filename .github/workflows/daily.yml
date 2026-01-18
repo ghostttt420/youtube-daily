@@ -61,8 +61,17 @@ jobs:
           git add neat-checkpoint-*
           git add theme.json
           
-          # Clean up old clips to keep repo light (optional but recommended)
+          # Clean up old clips to keep repo light
           # git rm training_clips/*.mp4 --ignore-unmatch
           
           git commit -m "🧠 Brain Evolution: Gen Update [skip ci]" || echo "No changes to commit"
           git push
+
+      # 6. SAVE ARTIFACT (Download Video Manually)
+      - name: Upload Video Artifact
+        if: always() 
+        # Run even if the YouTube upload failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-evolution-video
+          path: evolution_short.mp4

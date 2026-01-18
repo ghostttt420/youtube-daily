@@ -1,11 +1,8 @@
 import os
-
-# --- HEADLESS SERVER FIXES ---
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 os.environ["SDL_AUDIODRIVER"] = "dummy"
 
 import PIL.Image
-# MONKEY PATCH: Fix for MoviePy vs Pillow 10 incompatibility
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 
@@ -23,7 +20,7 @@ CLIPS_DIR = "training_clips"
 OUTPUT_FILE = "evolution_short.mp4"
 MUSIC_FILE = "music.mp3" 
 
-# LOAD THEME FOR TITLE
+# LOAD THEME
 try:
     with open("theme.json", "r") as f:
         THEME = json.load(f)
@@ -31,7 +28,7 @@ except:
     THEME = {"meta": {"title": "AI Learns to Drive 🧠🚗", "tags": ["ai"]}}
 
 def make_video():
-    print("🎬 Starting Narrative-Edit...")
+    print("🎬 Starting Montage-Edit...")
     
     if not os.path.exists(CLIPS_DIR):
         print(f"❌ Error: Directory '{CLIPS_DIR}' not found.")
@@ -42,21 +39,12 @@ def make_video():
         print("❌ Error: No .mp4 files found.")
         return None
 
-    # Sort Clips by generation number
-    try:
-        files = sorted(files, key=lambda x: int(x.split('_')[1].split('.')[0]))
-    except Exception as e:
-        print(f"⚠️ Warning: Sorting failed. ({e})")
-        files.sort()
-
-    # Select only the first (FAIL) and last (SUCCESS) clips
-    if len(files) >= 2:
-        selected_files = [files[0], files[-1]]
-    else:
-        # Fallback if only one clip exists
-        selected_files = files
+    # Sort files naturally: gen_00, gen_05, gen_10...
+    files.sort()
     
-    print(f"🎞️ Stitching Narrative: {selected_files}")
+    # USE ALL FILES (Not just first and last)
+    selected_files = files 
+    print(f"🎞️ Stitching {len(selected_files)} clips: {selected_files}")
     
     clips = []
     
@@ -64,116 +52,78 @@ def make_video():
         path = os.path.join(CLIPS_DIR, filename)
         clip = VideoFileClip(path)
         
-        # Resize if needed
         if clip.w > 1080: clip = clip.resize(width=1080)
         
+        # Get Gen Number
         try:
+            # Filename is gen_05.mp4 -> 5
             gen_num = int(filename.split('_')[1].split('.')[0])
         except: gen_num = 0
         
         # --- NARRATIVE LOGIC ---
-        # Clip 1: The FAIL (Gen 0)
         if i == 0:
             label = "Gen 0: NOOB 🤡"
             color = 'red'
-            # Hard cut to 8 seconds max for the fail clip
-            if clip.duration > 8:
-                clip = clip.subclip(0, 8)
-
-        # Clip 2: The SUCCESS (Final Gen)
-        else:
-            label = f"Gen {gen_num}: PRO 🏎️"
-            color = '#00FF41' 
-            # Allow this clip to be long to show the full run
-
-        # Add Text Overlay
-        try:
-            txt = TextClip(
-                label, 
-                fontsize=80, 
-                color=color, 
-                font='DejaVu-Sans-Bold', 
-                stroke_color='black', 
-                stroke_width=3
-            ).set_position(('center', 200)).set_duration(clip.duration)
+            # Gen 0: Force 5 seconds max
+            if clip.duration > 5: clip = clip.subclip(0, 5)
             
+        elif i == len(selected_files) - 1:
+            label = f"Gen {gen_num}: PRO 🏎️"
+            color = '#00FF41'
+            # Final Gen: Keep it long, we want to see the finish
+            
+        else:
+            label = f"Gen {gen_num}: Learning... 🧠"
+            color = 'yellow'
+            # Intermediate clips: Speed up to 5s max if they are long
+            if clip.duration > 5: clip = clip.subclip(0, 5)
+
+        try:
+            # Add Text Overlay
+            txt = TextClip(label, fontsize=80, color=color, font='DejaVu-Sans-Bold', stroke_color='black', stroke_width=3).set_position(('center', 200)).set_duration(clip.duration)
             comp = CompositeVideoClip([clip, txt])
             clips.append(comp)
-        except Exception as e:
-            print(f"⚠️ Text Error: {e}")
+        except:
             clips.append(clip)
 
-    # Concatenate
     final_video = concatenate_videoclips(clips, method="compose")
-    print(f"⏱️ Final Duration: {final_video.duration} seconds")
+    print(f"⏱️ Raw Stitch Duration: {final_video.duration} seconds")
     
-    # Speed up if over 60s
-    if final_video.duration > 59:
-        speed_factor = final_video.duration / 59.0
-        print(f"⚡ Speeding up by {speed_factor:.2f}x to fit 60s")
-        final_video = final_video.fx(vfx.speedx, speed_factor)
+    # --- ELASTIC TIME (GUARANTEE 59s) ---
+    target_duration = 59.0
+    
+    # Calculate Ratio
+    ratio = final_video.duration / target_duration
+    
+    # If video is 30s, Ratio is 0.5. We need to slow down (0.5x speed).
+    # If video is 90s, Ratio is 1.5. We need to speed up (1.5x speed).
+    
+    print(f"⚖️ Adjusting speed by factor {ratio:.2f}x to hit 59s")
+    final_video = final_video.fx(vfx.speedx, ratio)
 
     # Add Music
     if os.path.exists(MUSIC_FILE):
-        print(f"🎵 Layering Music: {MUSIC_FILE}")
         music = AudioFileClip(MUSIC_FILE)
-        
         if music.duration < final_video.duration:
             music = audio_loop(music, duration=final_video.duration)
         else:
             music = music.subclip(0, final_video.duration)
-            
         music = music.volumex(0.6) 
         final_video = final_video.set_audio(music)
 
-    # Render
-    print(f"💾 Rendering {OUTPUT_FILE}...")
-    final_video.write_videofile(
-        OUTPUT_FILE, 
-        fps=30, 
-        codec='libx264', 
-        audio_codec='aac',
-        preset='fast',
-        logger=None 
-    )
+    final_video.write_videofile(OUTPUT_FILE, fps=30, codec='libx264', audio_codec='aac', preset='fast', logger=None)
     return OUTPUT_FILE
 
 def upload_video():
-    print("🚀 Uploading to YouTube...")
+    print("🚀 Uploading...")
     try:
-        creds = Credentials(
-            None,
-            refresh_token=os.environ["YT_REFRESH_TOKEN"],
-            token_uri="https://oauth2.googleapis.com/token",
-            client_id=os.environ["YT_CLIENT_ID"],
-            client_secret=os.environ["YT_CLIENT_SECRET"]
-        )
+        creds = Credentials(None, refresh_token=os.environ["YT_REFRESH_TOKEN"], token_uri="https://oauth2.googleapis.com/token", client_id=os.environ["YT_CLIENT_ID"], client_secret=os.environ["YT_CLIENT_SECRET"])
         youtube = build("youtube", "v3", credentials=creds)
-
-        # Use dynamic title and tags from the theme
         title = f"{THEME['meta']['title']} #shorts"
-        description = (
-            "Evolutionary AI learns to race from scratch.\n"
-            "Watch the journey from crashing to pro driving!\n\n"
-            "#machinelearning #python #ai #neuralnetwork"
-        )
-        tags = THEME['meta']['tags'] + ["ai", "python", "machine learning", "coding"]
-
-        request = youtube.videos().insert(
-            part="snippet,status",
-            body={
-                "snippet": {
-                    "title": title,
-                    "description": description,
-                    "tags": tags,
-                    "categoryId": "28"
-                },
-                "status": { "privacyStatus": "public" }
-            },
-            media_body=MediaFileUpload(OUTPUT_FILE)
-        )
+        description = "Evolutionary AI learns to race.\n#machinelearning #python #ai"
+        request = youtube.videos().insert(part="snippet,status", body={"snippet": {"title": title, "description": description, "tags": THEME['meta']['tags'], "categoryId": "28"}, "status": { "privacyStatus": "public" }}, media_body=MediaFileUpload(OUTPUT_FILE))
         response = request.execute()
-        print(f"✅ Upload Complete! URL: https://youtu.be/{response['id']}")
+        print(f"✅ Upload Complete! https://youtu.be/{response['id']}")
     except Exception as e:
         print(f"❌ Upload Failed: {e}")
 
