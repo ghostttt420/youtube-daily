@@ -16,7 +16,6 @@ import simulation
 MAX_GENERATIONS = 30
 VIDEO_OUTPUT_DIR = "training_clips"
 FPS = 30 
-# Max duration for the PRO clip (allow it to finish the lap)
 MAX_FRAMES = FPS * 120 
 
 if not os.path.exists(VIDEO_OUTPUT_DIR): os.makedirs(VIDEO_OUTPUT_DIR)
@@ -28,7 +27,6 @@ except:
     THEME = {"map_seed": 42}
 
 def run_dummy_generation():
-    """Gen 0 with random steering (Guaranteed Fail)"""
     print("\n--- 🤡 Running Dummy Gen 0 ---")
     pygame.init()
     screen = pygame.display.set_mode((simulation.WIDTH, simulation.HEIGHT))
@@ -48,7 +46,7 @@ def run_dummy_generation():
     
     while running and len(cars) > 0:
         frame_count += 1
-        if frame_count > 300: break # 10s of chaos
+        if frame_count > 300: break 
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT: sys.exit()
@@ -113,7 +111,7 @@ def run_simulation(genomes, config):
     should_record = (GENERATION == MAX_GENERATIONS)
     
     if should_record:
-        print(f"🎥 Recording Gen {GENERATION} (The Pro Run)...")
+        print(f"🎥 Recording Gen {GENERATION}...")
         writer = imageio.get_writer(video_path, fps=FPS)
 
     running = True
@@ -127,7 +125,7 @@ def run_simulation(genomes, config):
         for event in pygame.event.get():
             if event.type == pygame.QUIT: sys.exit()
 
-        # Camera follows the car with most GATES passed
+        # Camera follows whoever passed the most gates
         leader = max(cars, key=lambda c: c.gates_passed * 1000 + c.distance_traveled)
         camera.update(leader)
         for c in cars: c.is_leader = (c == leader)
@@ -146,21 +144,23 @@ def run_simulation(genomes, config):
             car.update(map_mask)
             car.check_radar(map_mask)
             
-            # --- THE DONUT FIX ---
-            # Massive Reward for hitting a checkpoint
+            # --- STRICT FITNESS (NO FREE POINTS) ---
+            # 1. Huge Reward for Gates
             if car.check_gates(checkpoints):
-                ge[i].fitness += 500 
+                ge[i].fitness += 500
                 
-            # Tie-breaker points for speed
-            ge[i].fitness += car.velocity.length() * 0.1
+            # 2. NO SPEED REWARD. NONE. 
+            # This fixes the donuts. Spinning = 0 points.
             
-            # Penalty for stopping
-            if car.velocity.length() < 1: 
-                ge[i].fitness -= 1
+            # 3. Penalty for Stagnation happens inside car.update()
+            # If they die from timeout, we punish them slightly
+            if not car.alive and car.frames_since_gate > 150:
+                 ge[i].fitness -= 50
 
         for i in range(len(cars) - 1, -1, -1):
             if not cars[i].alive:
-                ge[i].fitness -= 20 # Crash penalty
+                # Standard Crash Penalty
+                ge[i].fitness -= 10 
                 cars.pop(i)
                 nets.pop(i)
                 ge.pop(i)
@@ -188,11 +188,8 @@ def run_simulation(genomes, config):
 def run_neat(config_path):
     global GENERATION
     GENERATION = 0
-    
-    # 1. RUN THE DUMMY GEN
     run_dummy_generation()
     
-    # 2. RUN REAL EVOLUTION
     config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
                                 neat.DefaultSpeciesSet, neat.DefaultStagnation,
                                 config_path)
