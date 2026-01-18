@@ -21,17 +21,13 @@ except:
         }
     }
 
-# --- CONFIGURATION ---
 WIDTH, HEIGHT = 1080, 1920
 WORLD_SIZE = 4000
 SENSOR_LENGTH = 300
 FPS = 30 
-
-# Visual Constants
 COL_BG = THEME["visuals"]["bg"]
 COL_WALL = THEME["visuals"]["wall"]
 
-# --- ASSET LOADING HELPER ---
 def load_sprite(filename, scale_size=None):
     path = os.path.join("assets", filename)
     if not os.path.exists(path):
@@ -58,14 +54,14 @@ class Car:
         
         self.radars = []
         self.alive = True
-        self.distance_traveled = 0 # Visual only
+        self.distance_traveled = 0 
         self.is_leader = False
         
-        # --- NEW: GATE SYSTEM (Fixes Donuts) ---
+        # --- NEW: ANTI-SPIN LOGIC ---
         self.gates_passed = 0
         self.next_gate_idx = 0
+        self.frames_since_gate = 0 # The Ticking Clock
         
-        # Assets
         self.sprite_norm = load_sprite("car_normal.png", (50, 85))
         self.sprite_leader = load_sprite("car_leader.png", (50, 85))
         self.shadow_surf = pygame.Surface((50, 85), pygame.SRCALPHA)
@@ -81,23 +77,32 @@ class Car:
         self.acceleration = self.acceleration_rate
 
     def check_gates(self, checkpoints):
-        """Returns True if the car hits the next invisible checkpoint."""
         if not self.alive: return False
         
+        # Determine target gate
         target_idx = self.next_gate_idx % len(checkpoints)
         target_pos = pygame.math.Vector2(checkpoints[target_idx])
         
         distance = self.position.distance_to(target_pos)
         
-        # Hit radius 250px
-        if distance < 250:
+        # Gate Hit Radius (300px is generous to encourage them)
+        if distance < 300:
             self.gates_passed += 1
             self.next_gate_idx += 1
-            return True # Reward!
+            self.frames_since_gate = 0 # RESET TIMER ON SUCCESS
+            return True
         return False
 
     def update(self, map_mask):
         if not self.alive: return
+
+        # --- THE TICKING CLOCK ---
+        self.frames_since_gate += 1
+        # If you haven't hit a gate in 5 seconds (150 frames), YOU DIE.
+        # This kills "donuts" immediately.
+        if self.frames_since_gate > 150:
+            self.alive = False
+            return
 
         self.velocity *= self.friction
         rad = math.radians(self.angle)
@@ -172,13 +177,6 @@ class Car:
         
         screen.blit(rotated_shadow, (cam_pos[0] + 6, cam_pos[1] + 8))
         screen.blit(rotated_img, cam_pos)
-        
-        # --- CLEANUP: SENSORS ARE NOW HIDDEN ---
-        # if self.is_leader:
-        #     for radar in self.radars:
-        #         end = camera.apply_point(radar[0])
-        #         start = camera.apply_point(self.position)
-        #         pygame.draw.line(screen, (0, 255, 0), start, end, 1)
 
 class Camera:
     def __init__(self, width, height):
@@ -227,8 +225,7 @@ class TrackGenerator:
             x_new, y_new = splev(u_new, tck, der=0)
             smooth_points = list(zip(x_new, y_new))
             
-            # --- GENERATE CHECKPOINTS ---
-            # Every 50th point is an invisible gate
+            # --- CHECKPOINTS EVERY 50 POINTS ---
             checkpoints = smooth_points[::50] 
         except:
             smooth_points = points
@@ -240,6 +237,11 @@ class TrackGenerator:
         pygame.draw.lines(vis_surf, (220, 220, 220), True, smooth_points, 450) 
         pygame.draw.lines(vis_surf, THEME["visuals"]["road"], True, smooth_points, 420) 
         pygame.draw.lines(vis_surf, THEME["visuals"]["center"], True, smooth_points, 4)
+        
+        # --- DRAW CHECKPOINTS (VISUAL DEBUG) ---
+        # We draw white circles so you can SEE the gates
+        for p in checkpoints:
+            pygame.draw.circle(vis_surf, (255, 255, 255), (int(p[0]), int(p[1])), 10)
 
         start_x, start_y = x_new[0], y_new[0]
         return (int(start_x), int(start_y)), phys_surf, vis_surf, checkpoints
