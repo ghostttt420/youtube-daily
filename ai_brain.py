@@ -28,7 +28,7 @@ except:
     THEME = {"map_seed": 42}
 
 def create_config_file():
-    # --- ADDED MISSING COMPATIBILITY COEFFICIENTS ---
+    # --- ADDED ALL MISSING MUTATION PARAMETERS ---
     config_content = """
 [NEAT]
 fitness_criterion     = max
@@ -74,9 +74,13 @@ weight_min_value        = -30
 weight_mutate_power     = 0.5
 weight_replace_rate     = 0.1
 
-# These were missing and caused the crash:
+# COMPATIBILITY COEFFICIENTS
 compatibility_disjoint_coefficient = 1.0
 compatibility_weight_coefficient   = 0.5
+
+# STRUCTURAL MUTATION FLAGS (The missing pieces)
+single_structural_mutation = False
+structural_mutation_surer  = default
 
 [DefaultSpeciesSet]
 compatibility_threshold = 3.0
@@ -187,7 +191,6 @@ def run_simulation(genomes, config):
 
     while running and len(cars) > 0:
         frame_count += 1
-        # Max Duration set to 60s
         if frame_count > MAX_FRAMES: break
 
         for event in pygame.event.get():
