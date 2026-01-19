@@ -18,6 +18,7 @@ WORLD_SIZE = 4000
 SENSOR_LENGTH = 300
 FPS = 30 
 COL_BG = THEME["visuals"]["bg"]
+COL_WALL = THEME["visuals"]["wall"]  # <--- FIXED: Restored this variable
 
 def load_sprite(filename, scale_size=None):
     path = os.path.join("assets", filename)
@@ -46,7 +47,7 @@ class Car:
         self.next_gate_idx = 0
         self.frames_since_gate = 0
         
-        self.radars = []  # <--- RESTORED THIS LIST
+        self.radars = [] 
         
         self.sprite_norm = load_sprite("car_normal.png", (50, 85))
         self.sprite_leader = load_sprite("car_leader.png", (50, 85))
@@ -131,10 +132,8 @@ class Car:
                 self.alive = False
         except: self.alive = False
 
-    # --- RESTORED RADAR FUNCTIONS (CRITICAL) ---
     def check_radar(self, map_mask):
         self.radars.clear()
-        # Cast rays in 5 directions (-60 to +60 degrees)
         for degree in [-60, -30, 0, 30, 60]:
             self.cast_ray(degree, map_mask)
 
@@ -144,18 +143,13 @@ class Car:
         vec = pygame.math.Vector2(math.cos(rad), math.sin(rad))
         center = self.position
         
-        # Raymarch until we hit a wall or reach max sensor length
         while length < SENSOR_LENGTH:
             length += 20
             check = center + vec * length
             try:
-                # If pixel is black (0), it's a wall/void
                 if map_mask.get_at((int(check.x), int(check.y))) == 0: break
             except: break
-        
-        # Store the distance to the wall
         self.radars.append([(int(check.x), int(check.y)), length])
-    # -------------------------------------------
 
     def draw(self, screen, camera):
         if not self.alive: return
