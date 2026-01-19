@@ -51,20 +51,22 @@ jobs:
       - name: Edit & Upload
         run: python final_render.py
 
-      # 5. PERSISTENCE (Save the Brain!)
+      # 5. PERSISTENCE (The Brain Saver)
       - name: Save Brain Progress
         run: |
           git config --global user.name "Auto-Evolution Bot"
           git config --global user.email "bot@factghost.com"
           
-          # Add new checkpoints and theme
+          # SMART CLEANUP:
+          # Keep only the most recent checkpoint to save space
+          # This command lists all checkpoints, sorts by time, keeps the newest, and deletes the rest
+          ls -t neat-checkpoint-* | tail -n +2 | xargs -r rm --
+          
+          # Add the survivor (latest checkpoint)
           git add neat-checkpoint-*
           git add theme.json
           
-          # Clean up old clips to keep repo light
-          # git rm training_clips/*.mp4 --ignore-unmatch
-          
-          git commit -m "🧠 Brain Evolution: Gen Update [skip ci]" || echo "No changes to commit"
+          git commit -m "🧠 Brain Evolution: Level Up [skip ci]" || echo "No changes to commit"
           git push
 
       # 6. SAVE ARTIFACT (Download Video Manually)
