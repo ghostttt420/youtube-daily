@@ -46,13 +46,56 @@ class Car:
         self.next_gate_idx = 0
         self.frames_since_gate = 0
         
+        self.radars = []  # <--- RESTORED THIS LIST
+        
         self.sprite_norm = load_sprite("car_normal.png", (50, 85))
         self.sprite_leader = load_sprite("car_leader.png", (50, 85))
         self.img_smoke = load_sprite("particle_smoke.png", (32, 32))
         
         self.particles = []
-        # We don't rely on rect for physics anymore, only for drawing
         self.rect = self.sprite_norm.get_rect(center=self.position)
+
+    def get_data(self, checkpoints):
+        if not self.alive: return [0, 0]
+        
+        target_idx = self.next_gate_idx % len(checkpoints)
+        target_pos = pygame.math.Vector2(checkpoints[target_idx])
+        
+        dx = target_pos.x - self.position.x
+        dy = target_pos.y - self.position.y
+        target_rad = math.atan2(dy, dx)
+        car_rad = math.radians(self.angle)
+        
+        diff = target_rad - car_rad
+        while diff > math.pi: diff -= 2 * math.pi
+        while diff < -math.pi: diff += 2 * math.pi
+        
+        heading_input = diff / math.pi
+        dist = self.position.distance_to(target_pos)
+        dist_input = min(dist / 1000.0, 1.0)
+        
+        return [heading_input, dist_input]
+
+    def input_steer(self, left=False, right=False):
+        if left: self.steering = -1
+        if right: self.steering = 1
+        
+    def input_gas(self):
+        self.acceleration = self.acceleration_rate
+
+    def check_gates(self, checkpoints):
+        if not self.alive: return False
+        
+        target_idx = self.next_gate_idx % len(checkpoints)
+        target_pos = pygame.math.Vector2(checkpoints[target_idx])
+        distance = self.position.distance_to(target_pos)
+        
+        if distance < 300:
+            self.gates_passed += 1
+            self.next_gate_idx += 1
+            self.frames_since_gate = 0 
+            return True
+        return False
 
     def update(self, map_mask):
         if not self.alive: return
@@ -69,10 +112,8 @@ class Car:
             self.velocity.scale_to_length(self.max_speed)
             
         if self.velocity.length() > 2:
-            # Steering
             self.angle += self.steering * self.velocity.length() * self.turn_speed
             
-            # Drift Smoke Logic
             if abs(self.steering) > 0.5 and self.velocity.length() > 15:
                 if random.random() < 0.3:
                     offset = pygame.math.Vector2(-20, 0).rotate(self.angle)
@@ -81,29 +122,50 @@ class Car:
         self.position += self.velocity
         self.distance_traveled += self.velocity.length()
         
-        # Update Rect for drawing only
         self.rect.center = (int(self.position.x), int(self.position.y))
         self.acceleration = 0
         self.steering = 0
         
-        # Collision Check
         try:
             if map_mask.get_at((int(self.position.x), int(self.position.y))) == 0:
                 self.alive = False
         except: self.alive = False
+
+    # --- RESTORED RADAR FUNCTIONS (CRITICAL) ---
+    def check_radar(self, map_mask):
+        self.radars.clear()
+        # Cast rays in 5 directions (-60 to +60 degrees)
+        for degree in [-60, -30, 0, 30, 60]:
+            self.cast_ray(degree, map_mask)
+
+    def cast_ray(self, degree, map_mask):
+        length = 0
+        rad = math.radians(self.angle + degree)
+        vec = pygame.math.Vector2(math.cos(rad), math.sin(rad))
+        center = self.position
+        
+        # Raymarch until we hit a wall or reach max sensor length
+        while length < SENSOR_LENGTH:
+            length += 20
+            check = center + vec * length
+            try:
+                # If pixel is black (0), it's a wall/void
+                if map_mask.get_at((int(check.x), int(check.y))) == 0: break
+            except: break
+        
+        # Store the distance to the wall
+        self.radars.append([(int(check.x), int(check.y)), length])
+    # -------------------------------------------
 
     def draw(self, screen, camera):
         if not self.alive: return
         img = self.sprite_leader if self.is_leader else self.sprite_norm
         rotated_img = pygame.transform.rotate(img, -self.angle - 90)
         
-        # Draw Car
-        # Important: We calculate position manually from camera to avoid rect-rounding jitter
         draw_pos = camera.apply_point(self.position)
         rect = rotated_img.get_rect(center=draw_pos)
         screen.blit(rotated_img, rect.topleft)
         
-        # Draw Smoke
         for i in range(len(self.particles)-1, -1, -1):
             pos, life = self.particles[i]
             life -= 1
@@ -120,30 +182,22 @@ class Camera:
         self.camera = pygame.Rect(0, 0, width, height)
         self.width = width
         self.height = height
-        # Float precision coordinates to prevent "grid snapping"
         self.exact_x = 0.0
         self.exact_y = 0.0
 
     def apply_point(self, pos):
-        # Returns the screen coordinates for a world position
         return (int(pos[0] + self.exact_x), int(pos[1] + self.exact_y))
 
     def update(self, target):
-        # 1. Target the TRUE float position, not the wobbling bounding box center
         target_x = -target.position.x + WIDTH / 2
         target_y = -target.position.y + HEIGHT / 2
         
-        # 2. Clamp to map bounds
         target_x = min(0, max(-(self.width - WIDTH), target_x))
         target_y = min(0, max(-(self.height - HEIGHT), target_y))
 
-        # 3. Butter Smooth Lerp
-        # We move 10% of the way to the target every frame.
-        # This eats the micro-jitters.
         self.exact_x += (target_x - self.exact_x) * 0.1
         self.exact_y += (target_y - self.exact_y) * 0.1
         
-        # We maintain the rect for compatibility, but mainly use exact_x/y
         self.camera = pygame.Rect(int(self.exact_x), int(self.exact_y), self.width, self.height)
 
 class TrackGenerator:
@@ -166,42 +220,26 @@ class TrackGenerator:
         
         pts = np.array(points)
         tck, u = splprep(pts.T, u=None, s=0.0, per=1)
-        # Increased resolution to 5000 for smoother curves
         u_new = np.linspace(u.min(), u.max(), 5000)
         x_new, y_new = splev(u_new, tck, der=0)
         smooth_points = list(zip(x_new, y_new))
         
         checkpoints = smooth_points[::70]
         
-        # --- PHYSICS LAYER ---
-        # Drawing one big line is fine for the collision mask
         pygame.draw.lines(phys_surf, (255, 255, 255), True, smooth_points, 450) 
         
-        # --- VISUAL LAYER (BRUSH STROKE METHOD) ---
-        # Instead of drawing lines (which glitch at sharp turns), we draw circles.
-        # This guarantees perfect round walls with no tearing.
-        
-        # Optimization: Don't draw every single point, skip some to save startup time
-        # Since our brush is huge (250px), stepping by 10 points (approx 20px) is fine.
         brush_points = smooth_points[::10]
-        
         wall_color = THEME["visuals"]["wall"]
         edge_color = (220, 220, 220)
         road_color = THEME["visuals"]["road"]
         
-        # 1. Base Wall (Widest)
         for p in brush_points:
             pygame.draw.circle(vis_surf, wall_color, (int(p[0]), int(p[1])), 250)
-            
-        # 2. White Edge/Curb
         for p in brush_points:
             pygame.draw.circle(vis_surf, edge_color, (int(p[0]), int(p[1])), 230)
-            
-        # 3. Asphalt (Road)
         for p in brush_points:
             pygame.draw.circle(vis_surf, road_color, (int(p[0]), int(p[1])), 210)
             
-        # 4. Center Line (Lines work fine for thin things)
         pygame.draw.lines(vis_surf, THEME["visuals"]["center"], True, smooth_points, 4)
         
         return (int(x_new[0]), int(y_new[0])), phys_surf, vis_surf, checkpoints, math.degrees(math.atan2(y_new[5]-y_new[0], x_new[5]-x_new[0]))
