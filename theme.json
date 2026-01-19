@@ -1,38 +1,37 @@
 {
-    "theme_key": "RETRO",
-    "map_seed": 959961,
+    "theme_key": "TOXIC",
+    "map_seed": 406950,
     "physics": {
-        "friction": 0.975
+        "friction": 0.95
     },
     "visuals": {
         "bg": [
-            35,
-            0,
-            50
+            20,
+            30,
+            10
         ],
         "road": [
+            40,
             60,
-            0,
-            90
+            20
         ],
         "wall": [
+            100,
             255,
-            0,
-            150
+            0
         ],
         "center": [
+            200,
             0,
-            255,
             255
         ]
     },
     "meta": {
-        "title": "AI 80s Retro Run \ud83d\udd79\ufe0f (Gen {gen})",
+        "title": "AI Survives the WASTELAND \u2622\ufe0f (Gen {gen})",
         "tags": [
-            "synthwave",
-            "80s",
-            "retro",
-            "arcade"
+            "post-apocalyptic",
+            "zombie",
+            "survival"
         ]
     }
 }
