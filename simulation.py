@@ -266,26 +266,17 @@ class Camera:
         return entity_rect.move(self.camera.topleft)
 
     def apply_point(self, pos):
-        return (pos[0] + self.camera.x, pos[1] + self.camera.y)
+        return (int(pos[0] + self.camera.x), int(pos[1] + self.camera.y))
 
     def update(self, target):
-        # Target position (Where we WANT to be)
-        target_x = -target.rect.centerx + int(WIDTH / 2)
-        target_y = -target.rect.centery + int(HEIGHT / 2)
-
-        # Apply constraints (Don't show outside map)
-        target_x = min(0, max(-(self.width - WIDTH), target_x))
-        target_y = min(0, max(-(self.height - HEIGHT), target_y))
-
-        # SMOOTHING LOGIC (Lerp)
-        # Instead of snapping, move 5% of the way there every frame
-        # This filters out the high-frequency jitter
-        self.camera.x += (target_x - self.camera.x) * 0.05
-        self.camera.y += (target_y - self.camera.y) * 0.05
+        # BACK TO STABLE HARD-FOLLOW
+        # Using integer math here prevents the "shimmering" effect
+        x = -int(target.rect.centerx) + int(WIDTH / 2)
+        y = -int(target.rect.centery) + int(HEIGHT / 2)
         
-        # We don't recreate the Rect, we just update x/y
-        # But for compatibility with existing code that might read .x/.y from rect:
-        self.camera = pygame.Rect(int(self.camera.x), int(self.camera.y), self.width, self.height)
+        x = min(0, max(-(self.width - WIDTH), x))
+        y = min(0, max(-(self.height - HEIGHT), y))
+        self.camera = pygame.Rect(x, y, self.width, self.height)
 
 
 class TrackGenerator:
