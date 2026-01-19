@@ -72,15 +72,21 @@ def generate_fx_assets():
     smoke = create_gradient_surface(16, (200, 200, 200))
     pygame.image.save(smoke, os.path.join(ASSET_DIR, "particle_smoke.png"))
     
-    # 2. NEON GLOW (Cyan for underglow)
-    glow_cyan = create_gradient_surface(40, (0, 255, 255))
+    # 2. NEON GLOW (Cyan) - REDUCED SIZE
+    # Radius reduced 40 -> 25
+    glow_cyan = create_gradient_surface(25, (0, 255, 255))
+    
+    # Optional: Manually lower alpha of the whole surface to make it subtle
+    glow_cyan.set_alpha(150) 
     pygame.image.save(glow_cyan, os.path.join(ASSET_DIR, "particle_glow_cyan.png"))
     
-    # 3. NEON GLOW (Magenta for leader)
-    glow_pink = create_gradient_surface(40, (255, 0, 255))
+    # 3. NEON GLOW (Magenta) - REDUCED SIZE
+    glow_pink = create_gradient_surface(25, (255, 0, 255))
+    glow_pink.set_alpha(150)
     pygame.image.save(glow_pink, os.path.join(ASSET_DIR, "particle_glow_pink.png"))
 
-    print("✨ Generated FX assets: Smoke & Neon")
+    print("✨ Generated FX assets: Smoke & Neon (Subtle Mode)")
+
 
 def generate_all_assets():
     pygame.init()
