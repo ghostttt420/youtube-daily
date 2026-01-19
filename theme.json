@@ -1,38 +1,38 @@
 {
-    "theme_key": "ICE",
-    "map_seed": 455598,
+    "theme_key": "DESERT",
+    "map_seed": 424274,
     "physics": {
-        "friction": 0.93
+        "friction": 0.955
     },
     "visuals": {
         "bg": [
-            220,
-            245,
-            255
+            160,
+            60,
+            30
         ],
         "road": [
-            160,
             210,
-            255
+            140,
+            90
         ],
         "wall": [
-            0,
-            100,
-            220
+            90,
+            40,
+            10
         ],
         "center": [
+            255,
             200,
-            240,
-            255
+            150
         ]
     },
     "meta": {
-        "title": "AI Tries Drifting on ICE \u2744\ufe0f (Gen {gen})",
+        "title": "AI Rallies on MARS \ud83d\ude80 (Gen {gen})",
         "tags": [
-            "drift",
-            "ice",
-            "winter",
-            "rally"
+            "rally",
+            "offroad",
+            "mars",
+            "space"
         ]
     }
 }
