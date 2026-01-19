@@ -1,92 +1,58 @@
 import pygame
 import os
-import math
 
 ASSET_DIR = "assets"
 if not os.path.exists(ASSET_DIR):
     os.makedirs(ASSET_DIR)
 
-def create_gradient_surface(radius, color):
-    """Creates a radial gradient (soft ball) for lights and smoke."""
-    surf = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
-    center = (radius, radius)
-    
-    # Draw multiple concentric circles with decreasing alpha
-    for i in range(radius, 0, -1):
-        alpha = int(255 * (1 - (i / radius))**2) # Exponential falloff for softness
-        if alpha > 0:
-            target_col = list(color) + [alpha]
-            pygame.draw.circle(surf, target_col, center, i)
-            
-    return surf
-
 def create_f1_sprite(color, filename):
-    """Generates a high-res F1 car sprite and saves it."""
-    # Dimensions
+    """Generates a high-res F1 car sprite."""
     w, h = 60, 100 
     surf = pygame.Surface((w, h), pygame.SRCALPHA)
-
-    # Colors
     body_col = color
     tire_col = (20, 20, 20)
     cockpit_col = (10, 10, 10)
     helmet_col = (255, 255, 0)
     wing_col = (50, 50, 50)
     
-    # Shadow (Fake depth)
-    shadow_surf = pygame.Surface((w, h), pygame.SRCALPHA)
-    pygame.draw.ellipse(shadow_surf, (0, 0, 0, 80), (5, 5, w-10, h-10))
-    surf.blit(shadow_surf, (2, 2))
-
+    # Simple shadow
+    pygame.draw.ellipse(surf, (0, 0, 0, 60), (5, 5, w-10, h-10))
+    
     # 1. Rear Wing
     pygame.draw.rect(surf, wing_col, (5, 85, 50, 10))
 
     # 2. Rear Tires
-    pygame.draw.rect(surf, tire_col, (0, 60, 12, 25), border_radius=3)  # Left
-    pygame.draw.rect(surf, tire_col, (48, 60, 12, 25), border_radius=3) # Right
+    pygame.draw.rect(surf, tire_col, (0, 60, 12, 25), border_radius=3)
+    pygame.draw.rect(surf, tire_col, (48, 60, 12, 25), border_radius=3)
 
-    # 3. Body (Main Fuselage)
-    # Tapered shape
-    pts = [(20, 10), (40, 10), (45, 60), (42, 90), (18, 90), (15, 60)]
-    pygame.draw.polygon(surf, body_col, pts)
+    # 3. Body
+    pygame.draw.polygon(surf, body_col, [(20, 10), (40, 10), (45, 60), (42, 90), (18, 90), (15, 60)])
 
     # 4. Front Tires
-    pygame.draw.rect(surf, tire_col, (0, 15, 10, 20), border_radius=3)  # Left
-    pygame.draw.rect(surf, tire_col, (50, 15, 10, 20), border_radius=3) # Right
+    pygame.draw.rect(surf, tire_col, (0, 15, 10, 20), border_radius=3)
+    pygame.draw.rect(surf, tire_col, (50, 15, 10, 20), border_radius=3)
 
     # 5. Front Wing
     pygame.draw.polygon(surf, wing_col, [(5, 5), (55, 5), (30, 0)])
 
-    # 6. Cockpit & Driver
+    # 6. Cockpit
     pygame.draw.ellipse(surf, cockpit_col, (25, 45, 10, 20))
     pygame.draw.circle(surf, helmet_col, (30, 50), 4)
 
-    # Save
     pygame.image.save(surf, os.path.join(ASSET_DIR, filename))
     print(f"🎨 Generated asset: {filename}")
 
 def generate_fx_assets():
-    """Generates particle effects like smoke and neon glow."""
+    """Simple smoke puff, no more distracting neon."""
+    surf = pygame.Surface((32, 32), pygame.SRCALPHA)
     
-    # 1. SMOKE PARTICLE (White puff)
-    smoke = create_gradient_surface(16, (200, 200, 200))
-    pygame.image.save(smoke, os.path.join(ASSET_DIR, "particle_smoke.png"))
-    
-    # 2. NEON GLOW (Cyan) - REDUCED SIZE
-    # Radius reduced 40 -> 25
-    glow_cyan = create_gradient_surface(25, (0, 255, 255))
-    
-    # Optional: Manually lower alpha of the whole surface to make it subtle
-    glow_cyan.set_alpha(150) 
-    pygame.image.save(glow_cyan, os.path.join(ASSET_DIR, "particle_glow_cyan.png"))
-    
-    # 3. NEON GLOW (Magenta) - REDUCED SIZE
-    glow_pink = create_gradient_surface(25, (255, 0, 255))
-    glow_pink.set_alpha(150)
-    pygame.image.save(glow_pink, os.path.join(ASSET_DIR, "particle_glow_pink.png"))
-
-    print("✨ Generated FX assets: Smoke & Neon (Subtle Mode)")
-
+    # Create a simple soft smoke particle
+    for i in range(16, 0, -1):
+        alpha = int(150 * (1 - (i / 16))) # Soft fade
+        pygame.draw.circle(surf, (200, 200, 200, alpha), (16, 16), i)
+        
+    pygame.image.save(surf, os.path.join(ASSET_DIR, "particle_smoke.png"))
+    print("✨ Generated FX assets: Smoke Only (Clean Mode)")
 
 def generate_all_assets():
     pygame.init()
