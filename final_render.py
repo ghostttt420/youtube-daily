@@ -18,8 +18,11 @@ from googleapiclient.http import MediaFileUpload
 # CONFIG
 CLIPS_DIR = "training_clips"
 OUTPUT_FILE = "evolution_short.mp4"
-MUSIC_FILE = "music.mp3" 
-ENGINE_FILE = "engine.mp3" # <--- NEW: You need to add this file
+
+# --- DJ SYSTEM ---
+# The script will randomly pick one of these found files
+MUSIC_OPTIONS = ["music.mp3", "music2.mp3", "music3.mp3"] 
+ENGINE_FILE = "engine.mp3" 
 
 # LOAD THEME
 try:
@@ -106,15 +109,23 @@ def make_video():
     # --- AUDIO MIXER ---
     audio_tracks = []
     
-    # 1. MUSIC TRACK
-    if os.path.exists(MUSIC_FILE):
-        music = AudioFileClip(MUSIC_FILE)
+    # 1. MUSIC TRACK (Random Shuffle)
+    # Filter list to only files that actually exist
+    available_music = [m for m in MUSIC_OPTIONS if os.path.exists(m)]
+    
+    if available_music:
+        chosen_song = random.choice(available_music)
+        print(f"🎵 DJ Selected: {chosen_song}")
+        
+        music = AudioFileClip(chosen_song)
         if music.duration < final_video.duration:
             music = audio_loop(music, duration=final_video.duration)
         else:
             music = music.subclip(0, final_video.duration)
         music = music.volumex(0.5) # Background volume
         audio_tracks.append(music)
+    else:
+        print("⚠️ Warning: No music files found.")
 
     # 2. ENGINE TRACK (Dynamic Volume)
     if os.path.exists(ENGINE_FILE):
