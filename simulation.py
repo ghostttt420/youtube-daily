@@ -2,6 +2,7 @@ import pygame
 import math
 import os
 import json
+import random # Needed for particle randomness
 import numpy as np
 from scipy.interpolate import splprep, splev
 
@@ -19,15 +20,21 @@ FPS = 30
 COL_BG = THEME["visuals"]["bg"]
 COL_WALL = THEME["visuals"]["wall"]
 
-def load_sprite(filename, scale_size=None):
+# Helper to check if map is "Dark" (for Neon effects)
+IS_NIGHT_MODE = sum(COL_BG) < 100 
+
+def load_sprite(filename, scale_size=None, alpha=255):
     path = os.path.join("assets", filename)
     if not os.path.exists(path):
+        # Fallback magenta box
         surf = pygame.Surface((scale_size if scale_size else (40, 60)))
         surf.fill((255, 0, 255)) 
         return surf
-    img = pygame.image.load(path)
+    img = pygame.image.load(path).convert_alpha()
     if scale_size:
         img = pygame.transform.scale(img, scale_size)
+    if alpha < 255:
+        img.set_alpha(alpha)
     return img
 
 class Car:
@@ -52,42 +59,41 @@ class Car:
         self.next_gate_idx = 0
         self.frames_since_gate = 0
         
+        # --- ASSETS ---
         self.sprite_norm = load_sprite("car_normal.png", (50, 85))
         self.sprite_leader = load_sprite("car_leader.png", (50, 85))
+        
+        # Shadow
         self.shadow_surf = pygame.Surface((50, 85), pygame.SRCALPHA)
         pygame.draw.ellipse(self.shadow_surf, (0, 0, 0, 80), (0, 0, 50, 85))
+        
+        # FX Assets
+        self.img_smoke = load_sprite("particle_smoke.png", (32, 32))
+        if IS_NIGHT_MODE:
+            self.img_glow = load_sprite("particle_glow_cyan.png", (120, 120))
+            self.img_glow_leader = load_sprite("particle_glow_pink.png", (120, 120))
+        
         self.skid_marks = [] 
+        self.particles = [] # List of [pos, velocity, life]
+        
         self.rect = self.sprite_norm.get_rect(center=self.position)
 
     def get_data(self, checkpoints):
-        """
-        Returns the GPS data for the AI input.
-        1. Angle to next gate (Normalized -1 to 1)
-        2. Distance to next gate (Normalized)
-        """
         if not self.alive: return [0, 0]
         
         target_idx = self.next_gate_idx % len(checkpoints)
         target_pos = pygame.math.Vector2(checkpoints[target_idx])
         
-        # 1. Calculate Angle to Target
         dx = target_pos.x - self.position.x
         dy = target_pos.y - self.position.y
         target_rad = math.atan2(dy, dx)
-        
-        # Car angle in radians
         car_rad = math.radians(self.angle)
         
-        # Relative angle (Delta)
         diff = target_rad - car_rad
-        # Normalize to -PI to +PI
         while diff > math.pi: diff -= 2 * math.pi
         while diff < -math.pi: diff += 2 * math.pi
         
-        # Input 1: Heading (-1.0 to 1.0)
         heading_input = diff / math.pi
-        
-        # Input 2: Distance (Normalized by arbitrary max distance)
         dist = self.position.distance_to(target_pos)
         dist_input = min(dist / 1000.0, 1.0)
         
@@ -107,7 +113,6 @@ class Car:
         target_pos = pygame.math.Vector2(checkpoints[target_idx])
         distance = self.position.distance_to(target_pos)
         
-        # Hit radius (User wanted strictness, but let's keep it generous for learning)
         if distance < 300:
             self.gates_passed += 1
             self.next_gate_idx += 1
@@ -115,10 +120,22 @@ class Car:
             return True
         return False
 
+    def spawn_smoke(self):
+        # Offset to rear tires
+        offset = pygame.math.Vector2(-20, 0).rotate(self.angle)
+        pos = self.position + offset
+        # Random jitter
+        pos.x += random.randint(-5, 5)
+        pos.y += random.randint(-5, 5)
+        
+        # Smoke stays roughly in place (visual effect)
+        vel = pygame.math.Vector2(0,0) 
+        life = random.randint(10, 20)
+        self.particles.append([pos, vel, life])
+
     def update(self, map_mask):
         if not self.alive: return
 
-        # Strict Death Timer: 3 seconds (90 frames)
         self.frames_since_gate += 1
         if self.frames_since_gate > 90:
             self.alive = False
@@ -136,11 +153,19 @@ class Car:
             rotation = self.steering * self.velocity.length() * self.turn_speed
             self.angle += rotation
             
-            if abs(self.steering) > 0.5 and self.velocity.length() > 15:
+            # --- DRIFT LOGIC ---
+            # If turning hard AND moving fast -> Drift
+            is_drifting = abs(self.steering) > 0.5 and self.velocity.length() > 15
+            
+            if is_drifting:
                 offset_l = pygame.math.Vector2(-15, -20).rotate(self.angle)
                 offset_r = pygame.math.Vector2(-15, 20).rotate(self.angle)
                 self.skid_marks.append([self.position + offset_l, 20]) 
                 self.skid_marks.append([self.position + offset_r, 20])
+                
+                # Spawn Smoke
+                if random.random() < 0.3: # Don't spawn every frame
+                    self.spawn_smoke()
 
         self.position += self.velocity
         self.distance_traveled += self.velocity.length()
@@ -177,6 +202,7 @@ class Car:
         self.radars.append([(int(check.x), int(check.y)), length])
 
     def draw(self, screen, camera):
+        # 1. Draw Skid Marks (Bottom Layer)
         for i in range(len(self.skid_marks) - 1, -1, -1):
             pos, life = self.skid_marks[i]
             life -= 1
@@ -188,6 +214,15 @@ class Car:
 
         if not self.alive: return
 
+        # 2. Draw Neon Glow (If Night Mode)
+        if IS_NIGHT_MODE:
+            glow = self.img_glow_leader if self.is_leader else self.img_glow
+            rect = glow.get_rect(center=self.position)
+            cam_pos = camera.apply(rect).topleft
+            # Add additive blending for "light" effect
+            screen.blit(glow, cam_pos, special_flags=pygame.BLEND_ADD)
+
+        # 3. Draw Car Body & Shadow
         img = self.sprite_leader if self.is_leader else self.sprite_norm
         rotated_img = pygame.transform.rotate(img, -self.angle - 90)
         rotated_shadow = pygame.transform.rotate(self.shadow_surf, -self.angle - 90)
@@ -197,6 +232,29 @@ class Car:
         
         screen.blit(rotated_shadow, (cam_pos[0] + 6, cam_pos[1] + 8))
         screen.blit(rotated_img, cam_pos)
+        
+        # 4. Draw Smoke Particles (Top Layer)
+        for i in range(len(self.particles) - 1, -1, -1):
+            pos, vel, life = self.particles[i]
+            life -= 1
+            self.particles[i][2] = life
+            
+            if life <= 0:
+                self.particles.pop(i)
+                continue
+                
+            # Update position (Drifting smoke stops moving as car leaves it)
+            # pos += vel 
+            
+            # Draw
+            adj_pos = camera.apply_point(pos)
+            
+            # Fade out
+            alpha = int((life / 20) * 150)
+            smoke_copy = self.img_smoke.copy()
+            smoke_copy.set_alpha(alpha)
+            
+            screen.blit(smoke_copy, (adj_pos[0]-16, adj_pos[1]-16))
 
 class Camera:
     def __init__(self, width, height):
@@ -245,8 +303,6 @@ class TrackGenerator:
             x_new, y_new = splev(u_new, tck, der=0)
             smooth_points = list(zip(x_new, y_new))
             
-            # --- USER REQUEST: MORE SPACES ---
-            # Changed from 50 to 70 for wider gaps between gates
             checkpoints = smooth_points[::70]
             
             p0 = smooth_points[0]
