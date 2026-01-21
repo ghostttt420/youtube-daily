@@ -5,6 +5,13 @@ on:
     - cron: '0 13,18,23 * * *'
   workflow_dispatch:
 
+# 🛡️ CONCURRENCY PROTECTION
+# Prevents race conditions. If a manual run starts while a schedule is running,
+# it waits for the first one to finish saving instead of crashing.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   run_evolution:
     runs-on: ubuntu-latest
@@ -21,16 +28,19 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Fetch full history for safer rebase
 
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
+      # 🛠️ UPDATED: Added Fonts for the new Viral Text Overlays
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg libsdl2-dev imagemagick
+          sudo apt-get install -y ffmpeg libsdl2-dev imagemagick fonts-dejavu fonts-liberation
           sudo sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml
           pip install --upgrade pip
           pip install -r requirements.txt
@@ -51,23 +61,30 @@ jobs:
       - name: Edit & Upload
         run: python final_render.py
 
-      # 5. PERSISTENCE (The Brain Saver)
+      # 5. PERSISTENCE (The Brain Saver + Rebase Fix)
       - name: Save Brain Progress
         run: |
           git config --global user.name "Auto-Evolution Bot"
           git config --global user.email "bot@factghost.com"
           
-          # SMART CLEANUP:
-          # Keep only the most recent checkpoint to save space
-          # This command lists all checkpoints, sorts by time, keeps the newest, and deletes the rest
+          # SMART CLEANUP: Keep only the newest checkpoint
           ls -t neat-checkpoint-* | tail -n +2 | xargs -r rm --
           
-          # Add the survivor (latest checkpoint)
+          # Add the survivor and theme
           git add neat-checkpoint-*
           git add theme.json
           
-          git commit -m "🧠 Brain Evolution: Level Up [skip ci]" || echo "No changes to commit"
-          git push
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+             echo "No changes to commit."
+          else
+             git commit -m "🧠 Brain Evolution: Level Up [skip ci]"
+             
+             # 🛡️ THE FIX: Pull latest changes before pushing to fix "Rejected" error
+             git pull --rebase origin main
+             
+             git push
+          fi
 
       # 6. SAVE ARTIFACT (Download Video Manually)
       - name: Upload Video Artifact
