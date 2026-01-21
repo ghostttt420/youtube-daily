@@ -1,38 +1,37 @@
 {
-    "theme_key": "RETRO",
-    "map_seed": 666893,
+    "theme_key": "CIRCUIT",
+    "map_seed": 565636,
     "physics": {
-        "friction": 0.975
+        "friction": 0.97
     },
     "visuals": {
         "bg": [
+            30,
             35,
-            0,
-            50
+            30
         ],
         "road": [
-            60,
-            0,
-            90
+            50,
+            50,
+            55
         ],
         "wall": [
-            255,
+            200,
             0,
-            150
+            0
         ],
         "center": [
-            0,
+            255,
             255,
             255
         ]
     },
     "meta": {
-        "title": "AI 80s Retro Run \ud83d\udd79\ufe0f (Gen {gen})",
+        "title": "AI Learns to Race F1 Style \ud83c\udfce\ufe0f (Gen {gen})",
         "tags": [
-            "synthwave",
-            "80s",
-            "retro",
-            "arcade"
+            "f1",
+            "racing",
+            "motorsport"
         ]
     }
 }
