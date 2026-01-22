@@ -70,19 +70,23 @@ jobs:
           # SMART CLEANUP: Keep only the newest checkpoint
           ls -t neat-checkpoint-* | tail -n +2 | xargs -r rm --
           
-          # Add the survivor and theme
+          # 1. Stage ONLY the files we want to save
           git add neat-checkpoint-*
           git add theme.json
           
-          # Check if there are changes to commit
+          # 2. Check if there are changes to commit
           if git diff --staged --quiet; then
              echo "No changes to commit."
           else
+             # 3. Create the Safe Save Point
              git commit -m "🧠 Brain Evolution: Level Up [skip ci]"
              
-             # 🛡️ THE FIX: Pull latest changes before pushing to fix "Rejected" error
-             git pull --rebase origin main
+             # 4. THE FIX: Wipe all other temporary changes (videos, cache, etc.)
+             # This makes the directory "clean" so the rebase won't complain.
+             git reset --hard HEAD
              
+             # 5. NOW we can safely pull and push
+             git pull --rebase origin main
              git push
           fi
 
