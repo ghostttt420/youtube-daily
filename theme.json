@@ -1,38 +1,38 @@
 {
-    "theme_key": "MIDNIGHT",
-    "map_seed": 737486,
+    "theme_key": "JUNGLE",
+    "map_seed": 340423,
     "physics": {
-        "friction": 0.965
+        "friction": 0.96
     },
     "visuals": {
         "bg": [
-            10,
-            10,
-            10
+            0,
+            40,
+            0
         ],
         "road": [
-            40,
-            40,
+            90,
+            70,
             40
         ],
         "wall": [
-            255,
-            215,
-            0
+            30,
+            100,
+            30
         ],
         "center": [
-            255,
-            255,
-            255
+            200,
+            200,
+            150
         ]
     },
     "meta": {
-        "title": "AI Tokyo Drift Run \ud83c\uddef\ud83c\uddf5 (Gen {gen})",
+        "title": "AI Offroad JUNGLE Run \ud83c\udf34 (Gen {gen})",
         "tags": [
-            "jdm",
-            "tokyo",
-            "drift",
-            "japan"
+            "jungle",
+            "offroad",
+            "4x4",
+            "mud"
         ]
     }
 }
