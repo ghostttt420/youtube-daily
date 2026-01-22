@@ -1,37 +1,38 @@
 {
-    "theme_key": "CIRCUIT",
-    "map_seed": 837009,
+    "theme_key": "ICE",
+    "map_seed": 174522,
     "physics": {
-        "friction": 0.97
+        "friction": 0.93
     },
     "visuals": {
         "bg": [
-            30,
-            35,
-            30
+            220,
+            245,
+            255
         ],
         "road": [
-            50,
-            50,
-            55
+            160,
+            210,
+            255
         ],
         "wall": [
-            200,
             0,
-            0
+            100,
+            220
         ],
         "center": [
-            255,
-            255,
+            200,
+            240,
             255
         ]
     },
     "meta": {
-        "title": "AI Learns to Race F1 Style \ud83c\udfce\ufe0f (Gen {gen})",
+        "title": "AI Tries Drifting on ICE \u2744\ufe0f (Gen {gen})",
         "tags": [
-            "f1",
-            "racing",
-            "motorsport"
+            "drift",
+            "ice",
+            "winter",
+            "rally"
         ]
     }
 }
