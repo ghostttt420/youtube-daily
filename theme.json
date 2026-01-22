@@ -1,38 +1,37 @@
 {
-    "theme_key": "ICE",
-    "map_seed": 174522,
+    "theme_key": "TOXIC",
+    "map_seed": 854285,
     "physics": {
-        "friction": 0.93
+        "friction": 0.95
     },
     "visuals": {
         "bg": [
-            220,
-            245,
-            255
+            20,
+            30,
+            10
         ],
         "road": [
-            160,
-            210,
-            255
+            40,
+            60,
+            20
         ],
         "wall": [
-            0,
             100,
-            220
+            255,
+            0
         ],
         "center": [
             200,
-            240,
+            0,
             255
         ]
     },
     "meta": {
-        "title": "AI Tries Drifting on ICE \u2744\ufe0f (Gen {gen})",
+        "title": "AI Survives the WASTELAND \u2622\ufe0f (Gen {gen})",
         "tags": [
-            "drift",
-            "ice",
-            "winter",
-            "rally"
+            "post-apocalyptic",
+            "zombie",
+            "survival"
         ]
     }
 }
