@@ -1,37 +1,38 @@
 {
-    "theme_key": "TOXIC",
-    "map_seed": 295259,
+    "theme_key": "LAVA",
+    "map_seed": 148191,
     "physics": {
-        "friction": 0.95
+        "friction": 0.94
     },
     "visuals": {
         "bg": [
-            20,
-            30,
-            10
+            40,
+            5,
+            5
         ],
         "road": [
-            40,
-            60,
+            80,
+            20,
             20
         ],
         "wall": [
-            100,
             255,
+            80,
             0
         ],
         "center": [
-            200,
-            0,
-            255
+            255,
+            255,
+            0
         ]
     },
     "meta": {
-        "title": "AI Survives the WASTELAND \u2622\ufe0f (Gen {gen})",
+        "title": "AI Races on LAVA \ud83d\udd25 (Gen {gen})",
         "tags": [
-            "post-apocalyptic",
-            "zombie",
-            "survival"
+            "lava",
+            "hot",
+            "danger",
+            "volcano"
         ]
     }
 }
