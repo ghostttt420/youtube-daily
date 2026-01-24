@@ -1,38 +1,38 @@
 {
-    "theme_key": "LAVA",
-    "map_seed": 148191,
+    "theme_key": "DESERT",
+    "map_seed": 283486,
     "physics": {
-        "friction": 0.94
+        "friction": 0.955
     },
     "visuals": {
         "bg": [
-            40,
-            5,
-            5
+            160,
+            60,
+            30
         ],
         "road": [
-            80,
-            20,
-            20
+            210,
+            140,
+            90
         ],
         "wall": [
-            255,
-            80,
-            0
+            90,
+            40,
+            10
         ],
         "center": [
             255,
-            255,
-            0
+            200,
+            150
         ]
     },
     "meta": {
-        "title": "AI Races on LAVA \ud83d\udd25 (Gen {gen})",
+        "title": "AI Rallies on MARS \ud83d\ude80 (Gen {gen})",
         "tags": [
-            "lava",
-            "hot",
-            "danger",
-            "volcano"
+            "rally",
+            "offroad",
+            "mars",
+            "space"
         ]
     }
 }
