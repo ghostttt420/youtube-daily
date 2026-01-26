@@ -1,38 +1,38 @@
 {
-    "theme_key": "ICE",
-    "map_seed": 652235,
+    "theme_key": "CYBER",
+    "map_seed": 563257,
     "physics": {
-        "friction": 0.93
+        "friction": 0.98
     },
     "visuals": {
         "bg": [
-            220,
-            245,
-            255
+            5,
+            0,
+            15
         ],
         "road": [
-            160,
-            210,
-            255
+            20,
+            20,
+            35
         ],
         "wall": [
             0,
-            100,
-            220
+            255,
+            255
         ],
         "center": [
-            200,
-            240,
+            255,
+            0,
             255
         ]
     },
     "meta": {
-        "title": "AI Tries Drifting on ICE \u2744\ufe0f (Gen {gen})",
+        "title": "AI Street Racing at NIGHT \ud83c\udf03 (Gen {gen})",
         "tags": [
+            "cyberpunk",
+            "neon",
             "drift",
-            "ice",
-            "winter",
-            "rally"
+            "night"
         ]
     }
 }
