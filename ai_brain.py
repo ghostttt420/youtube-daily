@@ -257,8 +257,7 @@ def run_simulation(genomes, config):
             dist_score = 1.0 - gps[1] 
             ge[i].fitness += dist_score * 0.05
 
-           if car.alive:
-                ge[i].fitness += 2
+           
 
             if not car.alive:
                  ge[i].fitness -= 200
