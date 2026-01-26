@@ -250,13 +250,17 @@ def run_simulation(genomes, config):
             car.check_radar(map_mask)
             
             if car.check_gates(checkpoints):
-                ge[i].fitness += 200
+                ge[i].fitness += 500
+            if car.gates_passed >= len(checkpoints):
+                ge[i].fitness += 2000 
             
             dist_score = 1.0 - gps[1] 
             ge[i].fitness += dist_score * 0.05
 
+           
+
             if not car.alive:
-                 ge[i].fitness -= 50
+                 ge[i].fitness -= 200
 
             if not car.alive and car.frames_since_gate > 450:
                  ge[i].fitness -= 20

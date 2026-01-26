@@ -1,38 +1,38 @@
 {
-    "theme_key": "JUNGLE",
-    "map_seed": 943494,
+    "theme_key": "ICE",
+    "map_seed": 652235,
     "physics": {
-        "friction": 0.96
+        "friction": 0.93
     },
     "visuals": {
         "bg": [
-            0,
-            40,
-            0
+            220,
+            245,
+            255
         ],
         "road": [
-            90,
-            70,
-            40
+            160,
+            210,
+            255
         ],
         "wall": [
-            30,
+            0,
             100,
-            30
+            220
         ],
         "center": [
             200,
-            200,
-            150
+            240,
+            255
         ]
     },
     "meta": {
-        "title": "AI Offroad JUNGLE Run \ud83c\udf34 (Gen {gen})",
+        "title": "AI Tries Drifting on ICE \u2744\ufe0f (Gen {gen})",
         "tags": [
-            "jungle",
-            "offroad",
-            "4x4",
-            "mud"
+            "drift",
+            "ice",
+            "winter",
+            "rally"
         ]
     }
 }
