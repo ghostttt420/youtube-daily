@@ -173,37 +173,34 @@ START_GEN = 0
 FINAL_GEN = 0
 GENERATION = 0
 
-def validate_color(color, default=(255, 255, 255)):
-    """Ensure color is valid for pygame."""
-    if color is None:
-        return default
+def draw_basic_hud(screen, leader, generation, frame_count, checkpoints, challenge_name):
+    """Simple fallback HUD when the main one fails."""
+    font = pygame.font.Font(None, 36)
     
-    if isinstance(color, str):
-        try:
-            # Try to convert string color names
-            color_obj = pygame.Color(color)
-            return (color_obj.r, color_obj.g, color_obj.b, color_obj.a)
-        except:
-            return default
+    # Draw generation and challenge info
+    gen_text = font.render(f"Gen {generation}: {challenge_name or 'Training'}", True, (255, 255, 255))
+    screen.blit(gen_text, (20, 20))
     
-    if isinstance(color, (tuple, list)):
-        # Ensure tuple has valid values
-        if len(color) >= 3:
-            try:
-                # Convert to int and clamp to 0-255
-                r = max(0, min(255, int(color[0])))
-                g = max(0, min(255, int(color[1])))
-                b = max(0, min(255, int(color[2])))
-                
-                if len(color) == 4:
-                    a = max(0, min(255, int(color[3])))
-                    return (r, g, b, a)
-                else:
-                    return (r, g, b)
-            except:
-                return default
+    # Draw gates info
+    gates_text = font.render(f"Gates: {leader.gates_passed}/{len(checkpoints)}", True, (255, 255, 255))
+    screen.blit(gates_text, (20, 60))
     
-    return default
+    # Draw distance
+    dist_text = font.render(f"Distance: {int(leader.distance_traveled)}", True, (255, 255, 255))
+    screen.blit(dist_text, (20, 100))
+    
+    # Draw frame count
+    frame_text = font.render(f"Frame: {frame_count}", True, (255, 255, 255))
+    screen.blit(frame_text, (20, 140))
+    
+    # Draw simple fitness indicator
+    fitness_bar_width = 200
+    fitness_fill = min(leader.fitness * 2, fitness_bar_width)  # Scale fitness to bar width
+    pygame.draw.rect(screen, (100, 100, 100), (20, 180, fitness_bar_width, 20))
+    pygame.draw.rect(screen, (0, 255, 0), (20, 180, int(fitness_fill), 20))
+    
+    fitness_text = font.render(f"Fitness: {int(leader.fitness)}", True, (255, 255, 255))
+    screen.blit(fitness_text, (20, 210))
 
 def run_simulation(genomes, config):
     global GENERATION
@@ -344,14 +341,13 @@ def run_simulation(genomes, config):
             screen.blit(visual_map, (camera.camera.x, camera.camera.y))
             for car in cars: car.draw(screen, camera)
 
-            # Use new HUD - with safe color handling
+            # Use HUD - with safe fallback
             try:
                 simulation.draw_hud(screen, leader, GENERATION, frame_count, checkpoints, challenge_name)
-            except ValueError as e:
-                if "invalid color argument" in str(e):
-                    print(f"⚠️  Color error in HUD for challenge '{challenge_name}', using fallback colors")
-                    # Use a safe fallback HUD
-                    simulation.draw_simple_hud(screen, leader, GENERATION, frame_count, checkpoints, challenge_name)
+            except (ValueError, AttributeError) as e:
+                if "invalid color argument" in str(e) or "'draw_simple_hud'" in str(e):
+                    print(f"⚠️  HUD error for challenge '{challenge_name}', using basic HUD")
+                    draw_basic_hud(screen, leader, GENERATION, frame_count, checkpoints, challenge_name)
                 else:
                     raise
 
