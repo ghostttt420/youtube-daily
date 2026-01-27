@@ -156,9 +156,9 @@ def run_dummy_generation():
         screen.fill(simulation.COL_BG)
         screen.blit(visual_map, (camera.camera.x, camera.camera.y))
         for car in cars: car.draw(screen, camera)
-        
+
         simulation.draw_text_with_outline(screen, "GEN 0: NOOBS", (20, 20), size=100, color=(255, 50, 50))
-        
+
         pygame.display.flip()
         try:
             pixels = pygame.surfarray.array3d(screen)
@@ -173,24 +173,59 @@ START_GEN = 0
 FINAL_GEN = 0
 GENERATION = 0
 
+def validate_color(color, default=(255, 255, 255)):
+    """Ensure color is valid for pygame."""
+    if color is None:
+        return default
+    
+    if isinstance(color, str):
+        try:
+            # Try to convert string color names
+            color_obj = pygame.Color(color)
+            return (color_obj.r, color_obj.g, color_obj.b, color_obj.a)
+        except:
+            return default
+    
+    if isinstance(color, (tuple, list)):
+        # Ensure tuple has valid values
+        if len(color) >= 3:
+            try:
+                # Convert to int and clamp to 0-255
+                r = max(0, min(255, int(color[0])))
+                g = max(0, min(255, int(color[1])))
+                b = max(0, min(255, int(color[2])))
+                
+                if len(color) == 4:
+                    a = max(0, min(255, int(color[3])))
+                    return (r, g, b, a)
+                else:
+                    return (r, g, b)
+            except:
+                return default
+    
+    return default
+
 def run_simulation(genomes, config):
     global GENERATION
     GENERATION += 1
-    
+
     # Check if we need to switch challenges
     if challenge_loader.should_switch_challenge(GENERATION):
         next_challenge = challenge_loader.switch_to_next_challenge(GENERATION)
         if next_challenge:
             challenge_loader.apply_challenge_config(next_challenge)
             # Reload theme after applying new challenge
-            with open("theme.json", "r") as f:
-                global THEME
-                THEME = json.load(f)
-    
+            try:
+                with open("theme.json", "r") as f:
+                    global THEME
+                    THEME = json.load(f)
+            except:
+                THEME = {"map_seed": 42}
+
     # Get current challenge info
     active_challenge = challenge_loader.get_active_challenge()
     challenge_name = active_challenge['name'] if active_challenge else None
-    
+
     print(f"\n--- 🏁 Gen {GENERATION} {f'({challenge_name})' if challenge_name else ''} ---")
 
     nets = []
@@ -218,16 +253,16 @@ def run_simulation(genomes, config):
     # 1. First gen of new challenge (the struggle)
     # 2. Every 50 gens (milestones)
     # 3. Last 5 gens of challenge (the mastery)
-    
+
     is_challenge_start = False
     is_challenge_end = False
-    
+
     if active_challenge:
         is_challenge_start = (GENERATION == active_challenge['start_gen'])
         is_challenge_end = (GENERATION >= active_challenge['target_gen'] - 5)
-    
+
     is_milestone = (GENERATION % 50 == 0)
-    
+
     should_record = is_challenge_start or is_milestone or is_challenge_end
 
     if should_record:
@@ -309,9 +344,17 @@ def run_simulation(genomes, config):
             screen.blit(visual_map, (camera.camera.x, camera.camera.y))
             for car in cars: car.draw(screen, camera)
 
-            # Use new HUD
-            simulation.draw_hud(screen, leader, GENERATION, frame_count, checkpoints, challenge_name)
-            
+            # Use new HUD - with safe color handling
+            try:
+                simulation.draw_hud(screen, leader, GENERATION, frame_count, checkpoints, challenge_name)
+            except ValueError as e:
+                if "invalid color argument" in str(e):
+                    print(f"⚠️  Color error in HUD for challenge '{challenge_name}', using fallback colors")
+                    # Use a safe fallback HUD
+                    simulation.draw_simple_hud(screen, leader, GENERATION, frame_count, checkpoints, challenge_name)
+                else:
+                    raise
+
             pygame.display.flip()
 
             if writer:
@@ -342,7 +385,7 @@ def run_neat(config_path):
         GENERATION = START_GEN
 
         p = neat.Checkpointer.restore_checkpoint(latest)
-        
+
         # Apply current challenge config
         active_challenge = challenge_loader.get_active_challenge()
         if active_challenge:
@@ -351,13 +394,13 @@ def run_neat(config_path):
             challenge_loader.apply_challenge_config(active_challenge)
     else:
         print("👶 NO BRAIN FOUND. STARTING FROM GEN 0.")
-        
+
         # Apply first challenge config
         active_challenge = challenge_loader.get_active_challenge()
         if active_challenge:
             print(f"🎯 FIRST CHALLENGE: {active_challenge['name']}")
             challenge_loader.apply_challenge_config(active_challenge)
-        
+
         run_dummy_generation()
         START_GEN = 0
         GENERATION = 0
