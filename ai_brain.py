@@ -12,17 +12,19 @@ import pygame
 import json
 import random
 import simulation 
+from challenge_loader import ChallengeLoader
 
 # CONFIG
-# We run 20 NEW generations every day. 
-# If yesterday ended at Gen 50, today goes to Gen 70.
-DAILY_GENERATIONS = 20  
+DAILY_GENERATIONS = 50  # Increased from 20
 VIDEO_OUTPUT_DIR = "training_clips"
 FPS = 30 
-MAX_FRAMES_PRO = 1800 # 60s for final
-MAX_FRAMES_TRAINING = 450 # 15s for training clips
+MAX_FRAMES_PRO = 3600  # 2 minutes for final showcase
+MAX_FRAMES_TRAINING = 900  # 30 seconds for training clips (up from 450)
 
 if not os.path.exists(VIDEO_OUTPUT_DIR): os.makedirs(VIDEO_OUTPUT_DIR)
+
+# Load challenges
+challenge_loader = ChallengeLoader()
 
 try:
     with open("theme.json", "r") as f:
@@ -31,12 +33,12 @@ except:
     THEME = {"map_seed": 42}
 
 def create_config_file():
-    # --- STABILIZED LEGACY CONFIG ---
+    # --- ENHANCED CONFIG FOR BETTER LEARNING ---
     config_content = """
 [NEAT]
 fitness_criterion     = max
 fitness_threshold     = 100000
-pop_size              = 40
+pop_size              = 80
 reset_on_extinction   = False
 no_fitness_termination = False
 
@@ -48,7 +50,6 @@ aggregation_default     = sum
 aggregation_mutate_rate = 0.0
 aggregation_options     = sum
 
-# Moderate mutation rates for steady long-term learning
 bias_init_mean          = 0.0
 bias_init_stdev         = 1.0
 bias_max_value          = 30.0
@@ -104,11 +105,11 @@ compatibility_threshold = 3.0
 
 [DefaultStagnation]
 species_fitness_func = max
-max_stagnation       = 20
+max_stagnation       = 30
 species_elitism      = 2
 
 [DefaultReproduction]
-elitism            = 2
+elitism            = 4
 survival_threshold = 0.2
 min_species_size   = 2
     """
@@ -117,7 +118,6 @@ min_species_size   = 2
 
 def run_dummy_generation():
     # Only run this if we are starting from SCRATCH (Gen 0)
-    # Otherwise we skip it to save time
     checkpoints = glob.glob("neat-checkpoint-*")
     if len(checkpoints) > 0:
         return
@@ -125,14 +125,14 @@ def run_dummy_generation():
     print("\n--- 🤡 Running Dummy Gen 0 (Fresh Start) ---")
     pygame.init()
     screen = pygame.display.set_mode((simulation.WIDTH, simulation.HEIGHT))
-    
+
     map_gen = simulation.TrackGenerator(seed=THEME["map_seed"])
-    start_pos, track_surface, visual_map, checkpoints, start_angle = map_gen.generate_track()
+    start_pos, track_surface, visual_map, checkpoints_map, start_angle = map_gen.generate_track()
     map_mask = pygame.mask.from_surface(track_surface)
     camera = simulation.Camera(simulation.WORLD_SIZE, simulation.WORLD_SIZE)
 
-    cars = [simulation.Car(start_pos, start_angle) for _ in range(40)]
-    
+    cars = [simulation.Car(start_pos, start_angle) for _ in range(80)]
+
     video_path = os.path.join(VIDEO_OUTPUT_DIR, "gen_00000.mp4")
     writer = imageio.get_writer(video_path, fps=FPS)
 
@@ -156,8 +156,9 @@ def run_dummy_generation():
         screen.fill(simulation.COL_BG)
         screen.blit(visual_map, (camera.camera.x, camera.camera.y))
         for car in cars: car.draw(screen, camera)
-        font = pygame.font.SysFont("consolas", 40, bold=True)
-        screen.blit(font.render("GEN 0 (NOOB)", True, simulation.COL_WALL), (20, 20))
+        
+        simulation.draw_text_with_outline(screen, "GEN 0: NOOBS", (20, 20), size=100, color=(255, 50, 50))
+        
         pygame.display.flip()
         try:
             pixels = pygame.surfarray.array3d(screen)
@@ -170,11 +171,27 @@ def run_dummy_generation():
 # Global to track start/end for this session
 START_GEN = 0
 FINAL_GEN = 0
+GENERATION = 0
 
 def run_simulation(genomes, config):
     global GENERATION
-    GENERATION += 1 # This will keep counting up (51, 52, 53...)
-    print(f"\n--- 🏁 Gen {GENERATION} ---")
+    GENERATION += 1
+    
+    # Check if we need to switch challenges
+    if challenge_loader.should_switch_challenge(GENERATION):
+        next_challenge = challenge_loader.switch_to_next_challenge(GENERATION)
+        if next_challenge:
+            challenge_loader.apply_challenge_config(next_challenge)
+            # Reload theme after applying new challenge
+            with open("theme.json", "r") as f:
+                global THEME
+                THEME = json.load(f)
+    
+    # Get current challenge info
+    active_challenge = challenge_loader.get_active_challenge()
+    challenge_name = active_challenge['name'] if active_challenge else None
+    
+    print(f"\n--- 🏁 Gen {GENERATION} {f'({challenge_name})' if challenge_name else ''} ---")
 
     nets = []
     cars = []
@@ -182,8 +199,8 @@ def run_simulation(genomes, config):
 
     pygame.init()
     screen = pygame.display.set_mode((simulation.WIDTH, simulation.HEIGHT))
-    
-    map_gen = simulation.TrackGenerator(seed=THEME["map_seed"])
+
+    map_gen = simulation.TrackGenerator()
     start_pos, track_surface, visual_map, checkpoints, start_angle = map_gen.generate_track()
     map_mask = pygame.mask.from_surface(track_surface)
     camera = simulation.Camera(simulation.WORLD_SIZE, simulation.WORLD_SIZE)
@@ -196,20 +213,24 @@ def run_simulation(genomes, config):
         ge.append(g)
 
     writer = None
-    
+
     # RECORDING LOGIC:
-    # 1. Always record the VERY FIRST generation of the day (The "Fish out of Water")
-    # 2. Record every 10th milestone
-    # 3. Always record the LAST generation of the day
+    # 1. First gen of new challenge (the struggle)
+    # 2. Every 50 gens (milestones)
+    # 3. Last 5 gens of challenge (the mastery)
     
-    is_first_of_day = (GENERATION == START_GEN + 1)
-    is_milestone = (GENERATION % 10 == 0)
-    is_last_of_day = (GENERATION >= FINAL_GEN)
+    is_challenge_start = False
+    is_challenge_end = False
     
-    should_record = is_first_of_day or is_milestone or is_last_of_day
+    if active_challenge:
+        is_challenge_start = (GENERATION == active_challenge['start_gen'])
+        is_challenge_end = (GENERATION >= active_challenge['target_gen'] - 5)
     
+    is_milestone = (GENERATION % 50 == 0)
+    
+    should_record = is_challenge_start or is_milestone or is_challenge_end
+
     if should_record:
-        # Padded filename so they sort correctly (gen_00050.mp4)
         filename = f"gen_{GENERATION:05d}.mp4"
         video_path = os.path.join(VIDEO_OUTPUT_DIR, filename)
         print(f"🎥 Recording Gen {GENERATION}...")
@@ -218,9 +239,9 @@ def run_simulation(genomes, config):
     running = True
     frame_count = 0
     for car in cars: car.check_radar(map_mask)
-    
-    # Give the "Pro" run (Last of day) full time (60s), others 15s
-    current_max_frames = MAX_FRAMES_PRO if is_last_of_day else MAX_FRAMES_TRAINING
+
+    # Give more time for end-of-challenge runs
+    current_max_frames = MAX_FRAMES_PRO if is_challenge_end else MAX_FRAMES_TRAINING
 
     while running and len(cars) > 0:
         frame_count += 1
@@ -235,7 +256,7 @@ def run_simulation(genomes, config):
 
         for i, car in enumerate(cars):
             if not car.alive: continue
-            
+
             if len(car.radars) < 5: inputs = [0] * 5
             else: inputs = [d[1] / simulation.SENSOR_LENGTH for d in car.radars]
             gps = car.get_data(checkpoints)
@@ -244,26 +265,38 @@ def run_simulation(genomes, config):
             output = nets[i].activate(inputs)
             if output[0] > 0.5: car.input_steer(right=True)
             elif output[0] < -0.5: car.input_steer(left=True)
-            
+
             car.input_gas()
             car.update(map_mask)
             car.check_radar(map_mask)
-            
+
+            # ENHANCED FITNESS FUNCTION
             if car.check_gates(checkpoints):
-                ge[i].fitness += 500
-            if car.gates_passed >= len(checkpoints):
-                ge[i].fitness += 2000 
-            
+                ge[i].fitness += 500  # Big reward for gates (up from 200)
+
+            # Reward staying alive
+            if car.alive:
+                ge[i].fitness += 1.5
+
+            # Reward speed
+            speed_bonus = car.velocity.length() / car.max_speed
+            ge[i].fitness += speed_bonus * 0.8  # Up from 0.05
+
+            # Distance to next gate (closer = better)
             dist_score = 1.0 - gps[1] 
-            ge[i].fitness += dist_score * 0.05
+            ge[i].fitness += dist_score * 0.1
 
-           
-
+            # HARSH death penalty
             if not car.alive:
-                 ge[i].fitness -= 200
+                ge[i].fitness -= 200  # Up from 50
 
-            if not car.alive and car.frames_since_gate > 450:
-                 ge[i].fitness -= 20
+            # Stuck penalty
+            if not car.alive and car.frames_since_gate > 100:
+                ge[i].fitness -= 50
+
+            # HUGE bonus for completing laps
+            if car.gates_passed >= len(checkpoints):
+                ge[i].fitness += 3000  # Massive lap completion bonus
 
         for i in range(len(cars) - 1, -1, -1):
             if not cars[i].alive:
@@ -275,11 +308,10 @@ def run_simulation(genomes, config):
             screen.fill(simulation.COL_BG)
             screen.blit(visual_map, (camera.camera.x, camera.camera.y))
             for car in cars: car.draw(screen, camera)
+
+            # Use new HUD
+            simulation.draw_hud(screen, leader, GENERATION, frame_count, checkpoints, challenge_name)
             
-            font = pygame.font.SysFont("consolas", 40, bold=True)
-            seconds = int(frame_count / FPS)
-            screen.blit(font.render(f"{seconds}s", True, (255, 255, 255)), (20, 60))
-            screen.blit(font.render(f"GEN {GENERATION}", True, simulation.COL_WALL), (20, 20))
             pygame.display.flip()
 
             if writer:
@@ -293,29 +325,39 @@ def run_simulation(genomes, config):
 
 def run_neat(config_path):
     global GENERATION, START_GEN, FINAL_GEN
-    
-    # 1. Clear OLD clips (but NOT checkpoints)
+
+    # 1. Clear OLD clips
     for f in glob.glob(os.path.join(VIDEO_OUTPUT_DIR, "*.mp4")):
         try: os.remove(f)
         except: pass
-    
+
     # 2. Check for brain history
     checkpoints = [f for f in os.listdir(".") if f.startswith("neat-checkpoint-")]
-    
+
     if checkpoints:
-        # Load the smartest brain from yesterday
         latest = sorted(checkpoints, key=lambda x: int(x.split('-')[2]))[-1]
-        print(f"🧠 RESTORING SUPER-BRAIN FROM: {latest}")
-        
-        # Parse Gen number (e.g. neat-checkpoint-50)
+        print(f"🧠 RESTORING BRAIN FROM: {latest}")
+
         START_GEN = int(latest.split('-')[2])
         GENERATION = START_GEN
-        
-        # Load it
+
         p = neat.Checkpointer.restore_checkpoint(latest)
+        
+        # Apply current challenge config
+        active_challenge = challenge_loader.get_active_challenge()
+        if active_challenge:
+            print(f"🎮 ACTIVE CHALLENGE: {active_challenge['name']}")
+            print(f"📊 Progress: Gen {GENERATION} / {active_challenge['target_gen']}")
+            challenge_loader.apply_challenge_config(active_challenge)
     else:
-        # First day ever
-        print("👶 NO BRAIN FOUND. BIRTH OF A NEW SPECIES.")
+        print("👶 NO BRAIN FOUND. STARTING FROM GEN 0.")
+        
+        # Apply first challenge config
+        active_challenge = challenge_loader.get_active_challenge()
+        if active_challenge:
+            print(f"🎯 FIRST CHALLENGE: {active_challenge['name']}")
+            challenge_loader.apply_challenge_config(active_challenge)
+        
         run_dummy_generation()
         START_GEN = 0
         GENERATION = 0
@@ -326,13 +368,12 @@ def run_neat(config_path):
 
     # 3. Set Goals
     FINAL_GEN = START_GEN + DAILY_GENERATIONS
-    print(f"🎯 MISSION: Evolve from Gen {START_GEN} -> Gen {FINAL_GEN}")
+    print(f"🎯 SESSION: Gen {START_GEN} → Gen {FINAL_GEN}")
 
     # 4. Run
     p.add_reporter(neat.StdOutReporter(True))
     p.add_reporter(neat.Checkpointer(generation_interval=5, filename_prefix="neat-checkpoint-"))
-    
-    # neat-python's run() takes the *number of generations to run*, not the target ID
+
     p.run(run_simulation, DAILY_GENERATIONS)
 
 if __name__ == "__main__":
