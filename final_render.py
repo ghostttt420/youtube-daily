@@ -6,210 +6,232 @@ import PIL.Image
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 
-import random
+import glob
 import json
-from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, concatenate_videoclips, AudioFileClip, CompositeAudioClip, vfx, ColorClip
-from moviepy.audio.fx.all import audio_loop
+from moviepy.editor import VideoFileClip, concatenate_videoclips, TextClip, CompositeVideoClip, AudioFileClip, CompositeAudioClip
+from moviepy.video.fx.all import speedx, fadein, fadeout
+from challenge_loader import ChallengeLoader
 
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
+VIDEO_DIR = "training_clips"
+OUTPUT_DIR = "final_shorts"
+MUSIC_FILE = "assets/music.mp3"
 
-# CONFIG
-CLIPS_DIR = "training_clips"
-OUTPUT_FILE = "evolution_short.mp4"
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
 
-# --- DJ SYSTEM ---
-MUSIC_OPTIONS = ["music.mp3", "music2.mp3", "music3.mp3"] 
-ENGINE_FILE = "engine.mp3" 
-
-# --- 1. VIRAL TITLE LIBRARY (Fixing "Titles need work") ---
-# The bot will pick one of these to make each video feel unique
-VIRAL_TITLES = [
-    "AI Learns to Drive: Gen 1 vs Gen {gen} 🤯",
-    "I taught an AI to drive and it did THIS... (Gen {gen})",
-    "Watch my AI go from NOOB to PRO in {gen} Gens 🚀",
-    "Can AI beat a Pro Driver? Gen {gen} Update",
-    "This AI Driver is getting SCARY good 🤖🚗",
-    "Evolution of AI Driving: Gen 0 to {gen}",
-    "AI Driving Fails vs Wins (Gen {gen})",
-    "You won't believe how good this AI got! (Gen {gen})",
-    "Satisfying AI Lines... Gen {gen} is CLEAN 🤤",
-    "Gen {gen}: The moment the AI became sentient 🏎️"
-]
-
-def get_viral_title(generation):
-    template = random.choice(VIRAL_TITLES)
-    return template.format(gen=generation)
-
-def make_video():
-    print("🎬 Starting Viral-Montage-Edit...")
+def add_text_overlay(clip, text, position='top', fontsize=80, color='white', bg_color='black'):
+    """Add text overlay to a clip"""
     
-    if not os.path.exists(CLIPS_DIR):
-        print(f"❌ Error: Directory '{CLIPS_DIR}' not found.")
-        return None, 0
+    # Position mapping
+    positions = {
+        'top': ('center', 50),
+        'bottom': ('center', clip.h - 150),
+        'center': ('center', 'center')
+    }
+    
+    try:
+        txt_clip = TextClip(
+            text, 
+            fontsize=fontsize, 
+            color=color,
+            font='DejaVu-Sans-Bold',
+            stroke_color=bg_color,
+            stroke_width=3,
+            method='caption',
+            size=(clip.w - 100, None)
+        )
+        
+        txt_clip = txt_clip.set_position(positions.get(position, 'top')).set_duration(clip.duration)
+        
+        return CompositeVideoClip([clip, txt_clip])
+    except Exception as e:
+        print(f"⚠️  Text overlay error: {e}")
+        return clip
 
-    files = [f for f in os.listdir(CLIPS_DIR) if f.endswith(".mp4")]
-    if not files:
-        print("❌ Error: No .mp4 files found.")
-        return None, 0
-
-    files.sort()
-    selected_files = files 
-    print(f"🎞️ Stitching {len(selected_files)} clips...")
+def create_challenge_short(challenge):
+    """
+    Create a 60-second short for a completed challenge
+    Shows: Struggle (10s) → Learning (10s) → Mastery (40s)
+    """
+    
+    challenge_id = challenge['id']
+    challenge_name = challenge['name']
+    start_gen = challenge['start_gen']
+    end_gen = challenge['end_gen']
+    
+    print(f"\n🎬 Creating short for: {challenge_name}")
+    print(f"📊 Gen Range: {start_gen} → {end_gen}")
     
     clips = []
-    last_gen_num = 0
-    engine_volumes = []
     
-    # --- 2. ADDING THE "HOOK" OVERLAY (Fixing Thumbnails/Hooks) ---
-    # We create a list of "Hooks" to burn into the first few seconds
-    hooks = [
-        "WAIT FOR IT... 💀",
-        "GEN 1 VS GEN 100",
-        "PURE CHAOS 🤡",
-        "SATISFYING 🤤",
-        "AI TRAINING... 🧬"
-    ]
-    chosen_hook = random.choice(hooks)
+    # 1. STRUGGLE (First gen of challenge) - 10 seconds
+    struggle_file = f"{VIDEO_DIR}/gen_{start_gen:05d}.mp4"
+    if os.path.exists(struggle_file):
+        print(f"📹 Loading struggle clip: Gen {start_gen}")
+        struggle = VideoFileClip(struggle_file)
+        struggle_duration = min(15, struggle.duration)
+        struggle = struggle.subclip(0, struggle_duration)
+        struggle = speedx(struggle, 1.5)  # Speed up to ~10s
+        struggle = add_text_overlay(struggle, f"NEW: {challenge_name.upper()}", position='top', color='red')
+        struggle = add_text_overlay(struggle, f"Gen {start_gen} - First Attempt", position='bottom', fontsize=60, color='yellow')
+        clips.append(struggle)
+    else:
+        print(f"⚠️  Struggle clip not found: {struggle_file}")
     
-    for i, filename in enumerate(selected_files):
-        path = os.path.join(CLIPS_DIR, filename)
-        clip = VideoFileClip(path)
+    # 2. LEARNING (Mid-point) - 10 seconds
+    mid_gen = (start_gen + end_gen) // 2
+    # Find closest recorded gen to mid_gen
+    all_gens = sorted([int(f.split('_')[1].split('.')[0]) for f in glob.glob(f"{VIDEO_DIR}/gen_*.mp4")])
+    if all_gens:
+        closest_mid = min(all_gens, key=lambda x: abs(x - mid_gen))
         
-        if clip.w > 1080: clip = clip.resize(width=1080)
-        
+        learning_file = f"{VIDEO_DIR}/gen_{closest_mid:05d}.mp4"
+        if os.path.exists(learning_file):
+            print(f"📹 Loading learning clip: Gen {closest_mid}")
+            learning = VideoFileClip(learning_file)
+            learning_duration = min(14, learning.duration)
+            learning = learning.subclip(0, learning_duration)
+            learning = speedx(learning, 1.4)  # Speed up to ~10s
+            learning = add_text_overlay(learning, f"Gen {closest_mid} - Improving...", position='bottom', fontsize=60, color='yellow')
+            clips.append(learning)
+        else:
+            print(f"⚠️  Learning clip not found: {learning_file}")
+    
+    # 3. MASTERY (Last gen of challenge) - 40 seconds
+    mastery_file = f"{VIDEO_DIR}/gen_{end_gen:05d}.mp4"
+    if os.path.exists(mastery_file):
+        print(f"📹 Loading mastery clip: Gen {end_gen}")
+        mastery = VideoFileClip(mastery_file)
+        mastery_duration = min(40, mastery.duration)
+        mastery = mastery.subclip(0, mastery_duration)
+        mastery = add_text_overlay(mastery, f"Gen {end_gen} - MASTERED 🏆", position='top', color='lime')
+        clips.append(mastery)
+    else:
+        print(f"⚠️  Mastery clip not found: {mastery_file}")
+    
+    if len(clips) == 0:
+        print("❌ No clips found to create short!")
+        return None
+    
+    # Concatenate all clips
+    print("🔗 Concatenating clips...")
+    final_clip = concatenate_videoclips(clips, method="compose")
+    
+    # Add music if available
+    if os.path.exists(MUSIC_FILE):
+        print("🎵 Adding background music...")
         try:
-            gen_num = int(filename.split('_')[1].split('.')[0])
-            if i == len(selected_files) - 1: last_gen_num = gen_num
-        except: gen_num = 0
-        
-        # LOGIC:
-        # Clip 0 = The "Hook" (Needs big text)
-        # Last Clip = The "Payoff" (Needs celebration text)
-        
-        if i == 0:
-            label = "Gen 0: TOTAL NOOB 🤡"
-            color = 'red'
-            engine_vol = 0.3
-            if clip.duration > 4: clip = clip.subclip(0, 4)
-            
-            # ADD THE HOOK OVERLAY (Big Text in center)
-            try:
-                # Big white text with black border
-                txt_hook = TextClip(chosen_hook, fontsize=110, color='white', font='DejaVu-Sans-Bold', stroke_color='black', stroke_width=5)
-                txt_hook = txt_hook.set_position(('center', 'center')).set_duration(clip.duration)
-                
-                # Smaller label below
-                txt_label = TextClip(label, fontsize=60, color=color, font='DejaVu-Sans-Bold', stroke_color='black', stroke_width=2)
-                txt_label = txt_label.set_position(('center', 0.8), relative=True).set_duration(clip.duration)
-                
-                clip = CompositeVideoClip([clip, txt_hook, txt_label])
-            except Exception as e:
-                print(f"⚠️ Text error: {e}")
-            
-        elif i == len(selected_files) - 1:
-            label = f"Gen {gen_num}: PRO LEVEL 🏎️"
-            color = '#00FF41' # Matrix Green
-            engine_vol = 0.8
-            
-            try:
-                txt = TextClip(label, fontsize=90, color=color, font='DejaVu-Sans-Bold', stroke_color='black', stroke_width=4).set_position(('center', 0.2), relative=True).set_duration(clip.duration)
-                clip = CompositeVideoClip([clip, txt])
-            except: pass
-            
-        else:
-            # Middle clips (Learning phase)
-            label = f"Gen {gen_num}: Learning..."
-            color = 'yellow'
-            engine_vol = 0.5
-            if clip.duration > 3: clip = clip.subclip(0, 3) # Keep middle clips short/fast
-            
-            try:
-                txt = TextClip(label, fontsize=60, color=color, font='DejaVu-Sans-Bold', stroke_color='black', stroke_width=2).set_position(('center', 0.8), relative=True).set_duration(clip.duration)
-                clip = CompositeVideoClip([clip, txt])
-            except: pass
-
-        engine_volumes.append((clip.duration, engine_vol))
-        clips.append(clip)
-
-    final_video = concatenate_videoclips(clips, method="compose")
+            audio = AudioFileClip(MUSIC_FILE).subclip(0, final_clip.duration)
+            audio = audio.volumex(0.3)  # Lower volume to 30%
+            final_clip = final_clip.set_audio(audio)
+        except Exception as e:
+            print(f"⚠️  Could not add music: {e}")
     
-    # --- ELASTIC TIME ---
-    target_duration = 58.0 # Aim slightly under 60s for safety
-    ratio = 1.0
-    if final_video.duration > 60.0:
-        ratio = final_video.duration / target_duration
-        print(f"⚡ Speeding up by {ratio:.2f}x")
-        final_video = final_video.fx(vfx.speedx, ratio)
-    elif final_video.duration < 15.0: # If too short, slow it down
-        ratio = final_video.duration / 58.0
-        # This effectively loops/stretches content, careful not to slow too much
-        # Better strategy for short videos: Loop it!
-        pass 
-
-    # --- AUDIO MIXER ---
-    audio_tracks = []
+    # Add fade in/out
+    final_clip = fadein(final_clip, 0.5)
+    final_clip = fadeout(final_clip, 0.5)
     
-    # 1. MUSIC (DJ System)
-    available_music = [m for m in MUSIC_OPTIONS if os.path.exists(m)]
-    if available_music:
-        chosen_song = random.choice(available_music)
-        print(f"🎵 DJ Selected: {chosen_song}")
-        music = AudioFileClip(chosen_song)
-        if music.duration < final_video.duration:
-            music = audio_loop(music, duration=final_video.duration)
-        else:
-            music = music.subclip(0, final_video.duration)
-        music = music.volumex(0.5)
-        audio_tracks.append(music)
+    # Export
+    output_file = f"{OUTPUT_DIR}/{challenge_id}_gen{start_gen}-{end_gen}.mp4"
+    print(f"💾 Exporting to: {output_file}")
+    
+    final_clip.write_videofile(
+        output_file,
+        fps=30,
+        codec='libx264',
+        audio_codec='aac',
+        preset='medium',
+        threads=4,
+        logger=None
+    )
+    
+    print(f"✅ Short created: {output_file}")
+    print(f"📺 Suggested Title: {challenge['video_hook']}")
+    
+    return output_file
 
-    # 2. ENGINE (Dynamic)
-    if os.path.exists(ENGINE_FILE):
-        base_engine = AudioFileClip(ENGINE_FILE)
-        base_engine = audio_loop(base_engine, duration=final_video.duration)
-        if ratio != 1.0:
-            base_engine = base_engine.fx(vfx.speedx, ratio)
-            base_engine = base_engine.subclip(0, final_video.duration)
-        base_engine = base_engine.volumex(0.4) 
-        audio_tracks.append(base_engine)
-
-    if audio_tracks:
-        final_audio = CompositeAudioClip(audio_tracks)
-        final_video = final_video.set_audio(final_audio)
-
-    final_video.write_videofile(OUTPUT_FILE, fps=30, codec='libx264', audio_codec='aac', preset='medium', logger=None)
-    return OUTPUT_FILE, last_gen_num
-
-def upload_video(last_gen):
-    print("🚀 Uploading...")
-    try:
-        creds = Credentials(None, refresh_token=os.environ["YT_REFRESH_TOKEN"], token_uri="https://oauth2.googleapis.com/token", client_id=os.environ["YT_CLIENT_ID"], client_secret=os.environ["YT_CLIENT_SECRET"])
-        youtube = build("youtube", "v3", credentials=creds)
-        
-        # --- 3. DYNAMIC METADATA (Fixing Discoverability) ---
-        title = get_viral_title(last_gen) + " #shorts"
-        
-        description = f"""
-        Watch AI learn to drive from scratch! 🧬🚗 
-        This is Generation {last_gen} of an evolutionary algorithm.
-        
-        Progression:
-        - Gen 0: Complete chaos
-        - Gen {last_gen}: Optimized neural network
-        
-        Subscribe to see if it can master the track! 
-        
-        #ai #machinelearning #python #coding #racing #simulation #neuralnetwork #tech #programming
-        """
-        
-        request = youtube.videos().insert(part="snippet,status", body={"snippet": {"title": title, "description": description, "tags": ["ai", "machine learning", "python", "racing", "simulation", "coding"], "categoryId": "28"}, "status": { "privacyStatus": "public" }}, media_body=MediaFileUpload(OUTPUT_FILE))
-        response = request.execute()
-        print(f"✅ Upload Complete! https://youtu.be/{response['id']}")
-    except Exception as e:
-        print(f"❌ Upload Failed: {e}")
+def create_evolution_short_simple():
+    """
+    Simpler version: Just show Gen 1 vs Latest Gen
+    Good for when you don't have challenge system set up yet
+    """
+    all_gens = sorted(glob.glob(f"{VIDEO_DIR}/gen_*.mp4"))
+    
+    if len(all_gens) < 2:
+        print("❌ Need at least 2 generations to create evolution short")
+        return None
+    
+    gen1_file = all_gens[0]
+    latest_file = all_gens[-1]
+    
+    gen1_num = int(gen1_file.split('_')[1].split('.')[0])
+    latest_num = int(latest_file.split('_')[1].split('.')[0])
+    
+    print(f"🎬 Creating evolution short: Gen {gen1_num} vs Gen {latest_num}")
+    
+    clips = []
+    
+    # Gen 1 - 10 seconds
+    gen1 = VideoFileClip(gen1_file)
+    gen1_duration = min(15, gen1.duration)
+    gen1 = gen1.subclip(0, gen1_duration)
+    gen1 = speedx(gen1, 1.5)
+    gen1 = add_text_overlay(gen1, f"GEN {gen1_num}: CHAOS 🤡", position='top', color='red')
+    clips.append(gen1)
+    
+    # Latest gen - 50 seconds
+    latest = VideoFileClip(latest_file)
+    latest_duration = min(50, latest.duration)
+    latest = latest.subclip(0, latest_duration)
+    latest = add_text_overlay(latest, f"GEN {latest_num}: MASTERED 🏆", position='top', color='lime')
+    clips.append(latest)
+    
+    final = concatenate_videoclips(clips, method="compose")
+    
+    # Add music
+    if os.path.exists(MUSIC_FILE):
+        try:
+            audio = AudioFileClip(MUSIC_FILE).subclip(0, final.duration)
+            audio = audio.volumex(0.3)
+            final = final.set_audio(audio)
+        except Exception as e:
+            print(f"⚠️  Could not add music: {e}")
+    
+    # Add fades
+    final = fadein(final, 0.5)
+    final = fadeout(final, 0.5)
+    
+    output_file = f"{OUTPUT_DIR}/evolution_gen{gen1_num}-{latest_num}.mp4"
+    
+    final.write_videofile(
+        output_file,
+        fps=30,
+        codec='libx264',
+        audio_codec='aac',
+        preset='medium',
+        threads=4,
+        logger=None
+    )
+    
+    print(f"✅ Evolution short created: {output_file}")
+    return output_file
 
 if __name__ == "__main__":
-    output_path, generation_count = make_video()
-    if output_path:
-        upload_video(generation_count)
+    # Check for completed challenges
+    challenge_loader = ChallengeLoader()
+    last_completed = challenge_loader.get_last_completed_challenge()
+    
+    if last_completed:
+        print(f"🎯 Found completed challenge: {last_completed['name']}")
+        output = create_challenge_short(last_completed)
+        
+        if output:
+            # Mark as video created
+            challenge_loader.mark_video_posted(last_completed['id'])
+            print(f"\n🎉 SHORT READY TO POST!")
+            print(f"📁 File: {output}")
+            print(f"📝 Suggested Title: {last_completed['video_hook']}")
+            print(f"📝 Suggested Description: AI learns {last_completed['name']} through evolution. Gen {last_completed['start_gen']} → Gen {last_completed['end_gen']}")
+    else:
+        print("ℹ️  No completed challenges found. Creating simple evolution short...")
+        create_evolution_short_simple()
