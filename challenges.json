@@ -1,0 +1,130 @@
+{
+  "active_challenge": {
+    "id": "basic_driving",
+    "name": "Basic Driving",
+    "start_gen": 1,
+    "target_gen": 500,
+    "config_changes": {
+      "physics": {
+        "friction": 0.97,
+        "max_speed": 35,
+        "turn_speed": 0.22,
+        "acceleration_rate": 1.4
+      },
+      "visuals": {
+        "bg": [8, 10, 15],
+        "wall": [255, 40, 100],
+        "road": [25, 28, 35],
+        "center": [0, 255, 255],
+        "leader_glow": [0, 255, 255, 120]
+      }
+    },
+    "video_hook": "I trained AI to drive from scratch",
+    "success_criteria": {
+      "min_laps": 3,
+      "avg_speed": 25
+    }
+  },
+  "challenge_history": [],
+  "upcoming_challenges": [
+    {
+      "id": "drift_master",
+      "name": "Drift Master",
+      "config_changes": {
+        "physics": {
+          "friction": 0.92,
+          "turn_speed": 0.25,
+          "max_speed": 38
+        },
+        "visuals": {
+          "wall": [255, 100, 0],
+          "center": [255, 200, 0]
+        }
+      },
+      "video_hook": "Gen 500 learned to drive... now can it DRIFT?",
+      "success_criteria": {
+        "min_laps": 2,
+        "avg_speed": 28
+      }
+    },
+    {
+      "id": "ice_racing",
+      "name": "Ice Racing",
+      "config_changes": {
+        "physics": {
+          "friction": 0.88,
+          "turn_speed": 0.15,
+          "max_speed": 32
+        },
+        "visuals": {
+          "bg": [15, 18, 25],
+          "wall": [100, 150, 255],
+          "road": [200, 220, 240],
+          "center": [150, 200, 255]
+        }
+      },
+      "video_hook": "Can a drift master handle ICE?",
+      "success_criteria": {
+        "min_laps": 2,
+        "avg_speed": 22
+      }
+    },
+    {
+      "id": "reverse_mode",
+      "name": "Reverse Driving",
+      "config_changes": {
+        "physics": {
+          "friction": 0.97,
+          "reverse_controls": true
+        },
+        "visuals": {
+          "wall": [255, 0, 150],
+          "center": [255, 0, 255]
+        }
+      },
+      "video_hook": "800 generations of training... then I REVERSED the controls",
+      "success_criteria": {
+        "min_laps": 2
+      }
+    },
+    {
+      "id": "night_mode",
+      "name": "Night Driving",
+      "config_changes": {
+        "physics": {
+          "friction": 0.97
+        },
+        "visuals": {
+          "bg": [2, 2, 5],
+          "wall": [80, 80, 100],
+          "road": [15, 15, 20],
+          "center": [200, 200, 0]
+        },
+        "sensors": {
+          "length": 250
+        }
+      },
+      "video_hook": "Can AI drive in the DARK?",
+      "success_criteria": {
+        "min_laps": 2
+      }
+    },
+    {
+      "id": "tight_corners",
+      "name": "Tight Corners",
+      "config_changes": {
+        "map": {
+          "seed": 88,
+          "tight_turns": true
+        },
+        "visuals": {
+          "wall": [255, 50, 50]
+        }
+      },
+      "video_hook": "Hairpin turns at 100 km/h",
+      "success_criteria": {
+        "min_laps": 2
+      }
+    }
+  ]
+}
