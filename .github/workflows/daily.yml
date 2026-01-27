@@ -1,100 +1,174 @@
-name: Project Evolution Daily
+name: Daily AI Training
 
 on:
   schedule:
-    
-  workflow_dispatch:
+    - cron: '0 2 * * *'  # Run at 2 AM UTC daily
+  workflow_dispatch:  # Allow manual trigger
 
-# 🛡️ CONCURRENCY PROTECTION
-# Prevents race conditions. If a manual run starts while a schedule is running,
-# it waits for the first one to finish saving instead of crashing.
+# Prevents race conditions
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
 
 jobs:
-  run_evolution:
+  train:
     runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours max
     permissions:
-      contents: write  # CRITICAL: Allows bot to push changes (save brains)
-
+      contents: write  # Allows pushing checkpoints and challenge updates
+    
     env:
-      SDL_VIDEODRIVER: dummy 
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
       YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
       YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
       IMAGEMAGICK_BINARY: /usr/bin/convert
-
+    
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0 # Fetch full history for safer rebase
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      # 🛠️ UPDATED: Added Fonts for the new Viral Text Overlays
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg libsdl2-dev imagemagick fonts-dejavu fonts-liberation
-          sudo sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml
-          pip install --upgrade pip
-          pip install -r requirements.txt
-
-      # 1. GENERATE THEME (Colors/Physics)
-      - name: Daily Config
-        run: python daily_config.py
-
-      # 2. PAINT ASSETS (Based on Theme)
-      - name: Generate Assets
-        run: python assets.py
-
-      # 3. EVOLVE (Reads checkpoints, runs sim)
-      - name: Run Simulation
-        run: python ai_brain.py
-
-      # 4. RENDER & UPLOAD
-      - name: Edit & Upload
-        run: python final_render.py
-
-      # 5. PERSISTENCE (The Brain Saver + Rebase Fix)
-      - name: Save Brain Progress
-        run: |
-          git config --global user.name "Auto-Evolution Bot"
-          git config --global user.email "bot@factghost.com"
-          
-          # SMART CLEANUP: Keep only the newest checkpoint
-          ls -t neat-checkpoint-* | tail -n +2 | xargs -r rm --
-          
-          # 1. Stage ONLY the files we want to save
-          git add neat-checkpoint-*
-          git add theme.json
-          
-          # 2. Check if there are changes to commit
-          if git diff --staged --quiet; then
-             echo "No changes to commit."
-          else
-             # 3. Create the Safe Save Point
-             git commit -m "🧠 Brain Evolution: Level Up [skip ci]"
-             
-             # 4. THE FIX: Wipe all other temporary changes (videos, cache, etc.)
-             # This makes the directory "clean" so the rebase won't complain.
-             git reset --hard HEAD
-             
-             # 5. NOW we can safely pull and push
-             git pull --rebase origin main
-             git push
-          fi
-
-      # 6. SAVE ARTIFACT (Download Video Manually)
-      - name: Upload Video Artifact
-        if: always() 
-        # Run even if the YouTube upload failed
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-evolution-video
-          path: evolution_short.mp4
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          python3-pygame \
+          ffmpeg \
+          xvfb \
+          libsdl2-dev \
+          libsdl2-image-dev \
+          libsdl2-mixer-dev \
+          libsdl2-ttf-dev \
+          imagemagick \
+          fonts-dejavu \
+          fonts-liberation
+        sudo sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml
+    
+    - name: Install Python dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Download previous checkpoint (if exists)
+      continue-on-error: true
+      run: |
+        gh release download latest --pattern "neat-checkpoint-*" || echo "No previous checkpoint found"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Run training
+      run: |
+        xvfb-run -a python ai_brain.py
+    
+    - name: Get generation info
+      id: gen_info
+      run: |
+        LATEST_CHECKPOINT=$(ls -t neat-checkpoint-* 2>/dev/null | head -1)
+        if [ -n "$LATEST_CHECKPOINT" ]; then
+          GENERATION=$(echo $LATEST_CHECKPOINT | grep -oP '\d+')
+          echo "CHECKPOINT_FILE=$LATEST_CHECKPOINT" >> $GITHUB_ENV
+          echo "GENERATION=$GENERATION" >> $GITHUB_ENV
+          echo "checkpoint_exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "checkpoint_exists=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Upload checkpoint as artifact
+      if: steps.gen_info.outputs.checkpoint_exists == 'true'
+      uses: actions/upload-artifact@v3
+      with:
+        name: checkpoint-gen-${{ env.GENERATION }}
+        path: neat-checkpoint-*
+        retention-days: 30
+    
+    - name: Upload training clips
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: training-clips-gen-${{ env.GENERATION }}
+        path: training_clips/*.mp4
+        retention-days: 7
+    
+    - name: Check if challenge completed
+      id: challenge_check
+      run: |
+        COMPLETED=$(python -c "
+        from challenge_loader import ChallengeLoader
+        loader = ChallengeLoader()
+        challenge = loader.get_last_completed_challenge()
+        if challenge:
+            print('true')
+        else:
+            print('false')
+        ")
+        echo "challenge_completed=$COMPLETED" >> $GITHUB_OUTPUT
+    
+    - name: Create video if challenge completed
+      if: steps.challenge_check.outputs.challenge_completed == 'true'
+      run: |
+        python render.py
+    
+    - name: Upload video artifact
+      if: steps.challenge_check.outputs.challenge_completed == 'true'
+      uses: actions/upload-artifact@v3
+      with:
+        name: youtube-short-gen-${{ env.GENERATION }}
+        path: final_shorts/*.mp4
+        retention-days: 30
+    
+    - name: Upload to YouTube (if video created)
+      if: steps.challenge_check.outputs.challenge_completed == 'true'
+      continue-on-error: true
+      run: |
+        python upload.py \
+          --file "final_shorts/*.mp4" \
+          --title "AI Evolution Challenge Complete! 🏆" \
+          --description "Watch AI learn through evolution! #Shorts #AI #MachineLearning" \
+          --category "28" \
+          --keywords "AI,machine learning,NEAT,evolution,driving" \
+          --privacyStatus "public"
+      env:
+        YOUTUBE_CLIENT_SECRETS: ${{ secrets.YOUTUBE_CLIENT_SECRETS }}
+        YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
+    
+    - name: Save checkpoint to release
+      if: steps.gen_info.outputs.checkpoint_exists == 'true'
+      continue-on-error: true
+      run: |
+        gh release create latest --title "Latest Training State" --notes "Generation ${{ env.GENERATION }}" || true
+        gh release upload latest ${{ env.CHECKPOINT_FILE }} --clobber
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Save progress (Brain + Challenges)
+      if: steps.gen_info.outputs.checkpoint_exists == 'true'
+      run: |
+        git config --global user.name "Auto-Evolution Bot"
+        git config --global user.email "bot@factghost.com"
+        
+        # Keep only newest checkpoint
+        ls -t neat-checkpoint-* | tail -n +2 | xargs -r rm --
+        
+        # Stage files we want to save
+        git add neat-checkpoint-* 2>/dev/null || true
+        git add challenges.json
+        git add theme.json
+        
+        # Commit if changes exist
+        if git diff --staged --quiet; then
+           echo "No changes to commit."
+        else
+           git commit -m "🧠 Brain Evolution Gen ${{ env.GENERATION }} [skip ci]"
+           git reset --hard HEAD
+           git pull --rebase origin main
+           git push
+        fi
