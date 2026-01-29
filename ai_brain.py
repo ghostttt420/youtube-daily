@@ -205,24 +205,21 @@ def draw_basic_hud(screen, leader, generation, frame_count, checkpoints, challen
 def run_simulation(genomes, config):
     global GENERATION
     GENERATION += 1
-
+    
     # Check if we need to switch challenges
     if challenge_loader.should_switch_challenge(GENERATION):
         next_challenge = challenge_loader.switch_to_next_challenge(GENERATION)
         if next_challenge:
             challenge_loader.apply_challenge_config(next_challenge)
             # Reload theme after applying new challenge
-            try:
-                with open("theme.json", "r") as f:
-                    global THEME
-                    THEME = json.load(f)
-            except:
-                THEME = {"map_seed": 42}
-
+            with open("theme.json", "r") as f:
+                global THEME
+                THEME = json.load(f)
+    
     # Get current challenge info
     active_challenge = challenge_loader.get_active_challenge()
     challenge_name = active_challenge['name'] if active_challenge else None
-
+    
     print(f"\n--- 🏁 Gen {GENERATION} {f'({challenge_name})' if challenge_name else ''} ---")
 
     nets = []
@@ -250,16 +247,16 @@ def run_simulation(genomes, config):
     # 1. First gen of new challenge (the struggle)
     # 2. Every 50 gens (milestones)
     # 3. Last 5 gens of challenge (the mastery)
-
+    
     is_challenge_start = False
     is_challenge_end = False
-
+    
     if active_challenge:
         is_challenge_start = (GENERATION == active_challenge['start_gen'])
         is_challenge_end = (GENERATION >= active_challenge['target_gen'] - 5)
-
+    
     is_milestone = (GENERATION % 50 == 0)
-
+    
     should_record = is_challenge_start or is_milestone or is_challenge_end
 
     if should_record:
@@ -336,7 +333,7 @@ def run_simulation(genomes, config):
                 nets.pop(i)
                 ge.pop(i)
 
-       if should_record or frame_count % 10 == 0:
+        if should_record or frame_count % 10 == 0:
             screen.fill(simulation.COL_BG)
             screen.blit(visual_map, (camera.camera.x, camera.camera.y))
             for car in cars: car.draw(screen, camera)
