@@ -359,7 +359,7 @@ def draw_hud(screen, car, generation, frame_count, checkpoints, challenge_name=N
         # Background bar
         pygame.draw.rect(screen, (40, 40, 50), (bar_x, bar_y, bar_width, bar_height), border_radius=20)
         
-        # Progress fill (gradient effect)
+        # Progress fill (gradient effect) - FIX: Ensure integers
         if progress > 0:
             fill_width = int(bar_width * progress)
             # Color transitions from red -> yellow -> green
@@ -369,6 +369,9 @@ def draw_hud(screen, car, generation, frame_count, checkpoints, challenge_name=N
                 fill_color = (int((1 - (progress - 0.33) * 3) * 255), 255, 0)  # Yellow to Green
             else:
                 fill_color = (0, 255, int((progress - 0.66) * 3 * 255))  # Green to Cyan
+            
+            # Ensure all color values are valid integers
+            fill_color = tuple(max(0, min(255, int(c))) for c in fill_color)
             
             pygame.draw.rect(screen, fill_color, (bar_x, bar_y, fill_width, bar_height), border_radius=20)
         
