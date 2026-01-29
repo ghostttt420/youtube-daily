@@ -241,9 +241,10 @@ def run_simulation(genomes, config):
         g.fitness = 0
         ge.append(g)
 
-    writer = None
+writer = None
+    video_path = None  # Initialize to None
 
-   # RECORDING LOGIC:
+    # RECORDING LOGIC:
     # 1. First gen of new challenge (the struggle)
     # 2. Every 50 gens (milestones)
     # 3. Last 5 gens of challenge (the mastery)
@@ -251,8 +252,9 @@ def run_simulation(genomes, config):
     is_challenge_start = False
     is_challenge_end = False
     
-    if active_challenge:
-        is_challenge_start = (GENERATION == active_challenge['start_gen'])
+if active_challenge:
+        # Consider it "challenge start" if we're within first 5 gens of the challenge
+        is_challenge_start = (active_challenge['start_gen'] <= GENERATION <= active_challenge['start_gen'] + 5)
         is_challenge_end = (GENERATION >= active_challenge['target_gen'] - 5)
     
     is_milestone = (GENERATION % 50 == 0)
@@ -261,7 +263,10 @@ def run_simulation(genomes, config):
     
     # DEBUG: Show recording decision
     print(f"📹 Recording check - Gen {GENERATION}:")
-    print(f"   - Challenge start: {is_challenge_start}")
+    if active_challenge:
+        print(f"   - Active challenge: {active_challenge['name']}")
+        print(f"   - Challenge range: {active_challenge['start_gen']} → {active_challenge['target_gen']}")
+    print(f"   - Challenge start: {is_challenge_start} (Gen == {active_challenge['start_gen'] if active_challenge else 'N/A'})")
     print(f"   - Milestone (÷50): {is_milestone}")
     print(f"   - Challenge end: {is_challenge_end}")
     print(f"   - WILL RECORD: {should_record}")
@@ -371,7 +376,20 @@ def run_simulation(genomes, config):
                     writer.append_data(pixels)
                 except: pass
 
-    if writer: writer.close()
+  if writer: 
+        writer.close()
+        if video_path:
+            print(f"✅ Saved recording: {video_path}")
+```
+
+---
+
+## Why Gen 531 isn't being recorded:
+
+Looking at the output:
+```
+🎮 ACTIVE CHALLENGE: Drift Master
+📊 Progress: Gen 530 / 731
 
 def run_neat(config_path):
     global GENERATION, START_GEN, FINAL_GEN
