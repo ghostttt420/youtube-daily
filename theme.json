@@ -1,38 +1,47 @@
 {
-    "theme_key": "DESERT",
-    "map_seed": 302547,
-    "physics": {
-        "friction": 0.955
-    },
-    "visuals": {
-        "bg": [
-            160,
-            60,
-            30
-        ],
-        "road": [
-            210,
-            140,
-            90
-        ],
-        "wall": [
-            90,
-            40,
-            10
-        ],
-        "center": [
-            255,
-            200,
-            150
-        ]
-    },
-    "meta": {
-        "title": "AI Rallies on MARS \ud83d\ude80 (Gen {gen})",
-        "tags": [
-            "rally",
-            "offroad",
-            "mars",
-            "space"
-        ]
-    }
+  "theme_key": "DESERT",
+  "map_seed": 302547,
+  "physics": {
+    "friction": 0.92,
+    "max_speed": 38,
+    "turn_speed": 0.25,
+    "acceleration_rate": 1.4
+  },
+  "visuals": {
+    "bg": [
+      8,
+      10,
+      15
+    ],
+    "road": [
+      25,
+      28,
+      35
+    ],
+    "wall": [
+      255,
+      100,
+      0
+    ],
+    "center": [
+      255,
+      200,
+      0
+    ],
+    "leader_glow": [
+      0,
+      255,
+      255,
+      120
+    ]
+  },
+  "meta": {
+    "title": "AI Rallies on MARS \ud83d\ude80 (Gen {gen})",
+    "tags": [
+      "rally",
+      "offroad",
+      "mars",
+      "space"
+    ]
+  }
 }
