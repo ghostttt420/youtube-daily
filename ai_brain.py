@@ -336,21 +336,25 @@ def run_simulation(genomes, config):
                 nets.pop(i)
                 ge.pop(i)
 
-        if should_record or frame_count % 10 == 0:
+       if should_record or frame_count % 10 == 0:
             screen.fill(simulation.COL_BG)
             screen.blit(visual_map, (camera.camera.x, camera.camera.y))
             for car in cars: car.draw(screen, camera)
 
-            # Use HUD - with safe fallback
+            # Use new HUD with error handling
             try:
                 simulation.draw_hud(screen, leader, GENERATION, frame_count, checkpoints, challenge_name)
-            except (ValueError, AttributeError) as e:
-                if "invalid color argument" in str(e) or "'draw_simple_hud'" in str(e):
-                    print(f"⚠️  HUD error for challenge '{challenge_name}', using basic HUD")
-                    draw_basic_hud(screen, leader, GENERATION, frame_count, checkpoints, challenge_name)
-                else:
-                    raise
-
+            except Exception as e:
+                # Fallback to simple text if HUD fails
+                print(f"⚠️  HUD error: {e}, using simple display")
+                font = pygame.font.SysFont("arial", 90, bold=True)
+                gen_text = font.render(f"GEN {GENERATION}", True, (255, 255, 255))
+                screen.blit(gen_text, (30, 30))
+                if challenge_name:
+                    font_small = pygame.font.SysFont("arial", 60, bold=True)
+                    challenge_text = font_small.render(challenge_name.upper(), True, (255, 200, 0))
+                    screen.blit(challenge_text, (30, 140))
+            
             pygame.display.flip()
 
             if writer:
