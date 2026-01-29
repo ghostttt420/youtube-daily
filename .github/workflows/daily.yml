@@ -79,6 +79,8 @@ jobs:
           echo "GENERATION=$GENERATION" >> $GITHUB_ENV
           echo "checkpoint_exists=true" >> $GITHUB_OUTPUT
         else
+          echo "CHECKPOINT_FILE=none" >> $GITHUB_ENV
+          echo "GENERATION=0" >> $GITHUB_ENV
           echo "checkpoint_exists=false" >> $GITHUB_OUTPUT
         fi
     
@@ -90,35 +92,58 @@ jobs:
         path: neat-checkpoint-*
         retention-days: 30
     
+    - name: Prepare training clips for upload
+      if: always()
+      run: |
+        if [ -d "training_clips" ] && [ "$(ls -A training_clips/*.mp4 2>/dev/null)" ]; then
+          echo "Found training clips to upload"
+        else
+          echo "No training clips found (no milestones hit this run)"
+          mkdir -p training_clips
+          echo "No clips recorded this session" > training_clips/README.txt
+        fi
+    
     - name: Upload training clips
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: training-clips-gen-${{ env.GENERATION }}
-        path: training_clips/*.mp4
+        path: training_clips/
         retention-days: 7
     
     - name: Check if challenge completed
       id: challenge_check
+      continue-on-error: true
       run: |
         COMPLETED=$(python -c "
         from challenge_loader import ChallengeLoader
         loader = ChallengeLoader()
         challenge = loader.get_last_completed_challenge()
-        if challenge:
-            print('true')
-        else:
-            print('false')
-        ")
+        print('true' if challenge else 'false')
+        " 2>/dev/null || echo "false")
         echo "challenge_completed=$COMPLETED" >> $GITHUB_OUTPUT
+        echo "Challenge completed status: $COMPLETED"
     
     - name: Create video if challenge completed
       if: steps.challenge_check.outputs.challenge_completed == 'true'
+      continue-on-error: true
       run: |
-        python render.py
+        python render.py || echo "⚠️ Video creation failed"
+    
+    - name: Check for video output
+      id: video_check
+      if: steps.challenge_check.outputs.challenge_completed == 'true'
+      run: |
+        if [ -d "final_shorts" ] && [ "$(ls -A final_shorts/*.mp4 2>/dev/null)" ]; then
+          echo "video_exists=true" >> $GITHUB_OUTPUT
+          echo "✅ Video file found"
+        else
+          echo "video_exists=false" >> $GITHUB_OUTPUT
+          echo "❌ No video file found"
+        fi
     
     - name: Upload video artifact
-      if: steps.challenge_check.outputs.challenge_completed == 'true'
+      if: steps.challenge_check.outputs.challenge_completed == 'true' && steps.video_check.outputs.video_exists == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: youtube-short-gen-${{ env.GENERATION }}
@@ -126,19 +151,28 @@ jobs:
         retention-days: 30
     
     - name: Upload to YouTube (if video created)
-      if: steps.challenge_check.outputs.challenge_completed == 'true'
+      if: steps.challenge_check.outputs.challenge_completed == 'true' && steps.video_check.outputs.video_exists == 'true'
       continue-on-error: true
       run: |
+        # Get video title from challenge
+        VIDEO_TITLE=$(python -c "
+        from challenge_loader import ChallengeLoader
+        loader = ChallengeLoader()
+        challenge = loader.get_last_completed_challenge()
+        print(challenge['video_hook'] if challenge else 'AI Evolution Challenge Complete!')
+        " 2>/dev/null || echo "AI Evolution Challenge Complete! 🏆")
+        
         python upload.py \
           --file "final_shorts/*.mp4" \
-          --title "AI Evolution Challenge Complete! 🏆" \
+          --title "$VIDEO_TITLE #Shorts" \
           --description "Watch AI learn through evolution! #Shorts #AI #MachineLearning" \
           --category "28" \
           --keywords "AI,machine learning,NEAT,evolution,driving" \
           --privacyStatus "public"
       env:
-        YOUTUBE_CLIENT_SECRETS: ${{ secrets.YOUTUBE_CLIENT_SECRETS }}
-        YOUTUBE_CREDENTIALS: ${{ secrets.YOUTUBE_CREDENTIALS }}
+        YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+        YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+        YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
     
     - name: Save checkpoint to release
       if: steps.gen_info.outputs.checkpoint_exists == 'true'
