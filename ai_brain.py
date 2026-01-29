@@ -243,7 +243,7 @@ def run_simulation(genomes, config):
 
     writer = None
 
-    # RECORDING LOGIC:
+   # RECORDING LOGIC:
     # 1. First gen of new challenge (the struggle)
     # 2. Every 50 gens (milestones)
     # 3. Last 5 gens of challenge (the mastery)
@@ -258,11 +258,21 @@ def run_simulation(genomes, config):
     is_milestone = (GENERATION % 50 == 0)
     
     should_record = is_challenge_start or is_milestone or is_challenge_end
+    
+    # DEBUG: Show recording decision
+    print(f"📹 Recording check - Gen {GENERATION}:")
+    print(f"   - Challenge start: {is_challenge_start}")
+    print(f"   - Milestone (÷50): {is_milestone}")
+    print(f"   - Challenge end: {is_challenge_end}")
+    print(f"   - WILL RECORD: {should_record}")
 
     if should_record:
         filename = f"gen_{GENERATION:05d}.mp4"
         video_path = os.path.join(VIDEO_OUTPUT_DIR, filename)
-        print(f"🎥 Recording Gen {GENERATION}...")
+        print(f"🎥 Recording Gen {GENERATION} to {video_path}...")
+        writer = imageio.get_writer(video_path, fps=FPS)
+    else:
+        print(f"⏭️  Skipping recording for Gen {GENERATION}")
         writer = imageio.get_writer(video_path, fps=FPS)
 
     running = True
