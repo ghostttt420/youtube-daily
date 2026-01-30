@@ -381,8 +381,7 @@ def run_simulation(genomes, config):
 
 Looking at the output:
 ```
-🎮 ACTIVE CHALLENGE: Drift Master
-📊 Progress: Gen 530 / 731
+
 
 def run_neat(config_path):
     global GENERATION, START_GEN, FINAL_GEN
