@@ -234,7 +234,7 @@ def run_simulation(genomes, config):
     map_mask = pygame.mask.from_surface(track_surface)
     camera = simulation.Camera(simulation.WORLD_SIZE, simulation.WORLD_SIZE)
 
- for _, g in genomes:
+    for _, g in genomes:
         net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
         cars.append(simulation.Car(start_pos, start_angle)) 
@@ -242,31 +242,24 @@ def run_simulation(genomes, config):
         ge.append(g)
 
     writer = None
-    video_path = None  # Initialize to None
+    video_path = None
 
-    # RECORDING LOGIC:
-    # 1. First gen of new challenge (the struggle)
-    # 2. Every 50 gens (milestones)
-    # 3. Last 5 gens of challenge (the mastery)
-    
+    # RECORDING LOGIC
     is_challenge_start = False
     is_challenge_end = False
     
     if active_challenge:
-        # Consider it "challenge start" if we're within first 5 gens of the challenge
         is_challenge_start = (active_challenge['start_gen'] <= GENERATION <= active_challenge['start_gen'] + 5)
         is_challenge_end = (GENERATION >= active_challenge['target_gen'] - 5)
     
     is_milestone = (GENERATION % 50 == 0)
-    
     should_record = is_challenge_start or is_milestone or is_challenge_end
     
-    # DEBUG: Show recording decision
     print(f"📹 Recording check - Gen {GENERATION}:")
     if active_challenge:
         print(f"   - Active challenge: {active_challenge['name']}")
         print(f"   - Challenge range: {active_challenge['start_gen']} → {active_challenge['target_gen']}")
-    print(f"   - Challenge start: {is_challenge_start} (Gen == {active_challenge['start_gen'] if active_challenge else 'N/A'})")
+    print(f"   - Challenge start: {is_challenge_start}")
     print(f"   - Milestone (÷50): {is_milestone}")
     print(f"   - Challenge end: {is_challenge_end}")
     print(f"   - WILL RECORD: {should_record}")
@@ -281,65 +274,66 @@ def run_simulation(genomes, config):
 
     running = True
     frame_count = 0
-    for car in cars: car.check_radar(map_mask)
+    for car in cars: 
+        car.check_radar(map_mask)
 
-    # Give more time for end-of-challenge runs
     current_max_frames = MAX_FRAMES_PRO if is_challenge_end else MAX_FRAMES_TRAINING
 
     while running and len(cars) > 0:
         frame_count += 1
-        if frame_count > current_max_frames: break
+        if frame_count > current_max_frames: 
+            break
 
         for event in pygame.event.get():
-            if event.type == pygame.QUIT: sys.exit()
+            if event.type == pygame.QUIT: 
+                sys.exit()
 
         leader = max(cars, key=lambda c: c.gates_passed * 1000 + c.distance_traveled)
         camera.update(leader)
-        for c in cars: c.is_leader = (c == leader)
+        for c in cars: 
+            c.is_leader = (c == leader)
 
         for i, car in enumerate(cars):
-            if not car.alive: continue
+            if not car.alive: 
+                continue
 
-            if len(car.radars) < 5: inputs = [0] * 5
-            else: inputs = [d[1] / simulation.SENSOR_LENGTH for d in car.radars]
+            if len(car.radars) < 5: 
+                inputs = [0] * 5
+            else: 
+                inputs = [d[1] / simulation.SENSOR_LENGTH for d in car.radars]
             gps = car.get_data(checkpoints)
             inputs.extend(gps)
 
             output = nets[i].activate(inputs)
-            if output[0] > 0.5: car.input_steer(right=True)
-            elif output[0] < -0.5: car.input_steer(left=True)
+            if output[0] > 0.5: 
+                car.input_steer(right=True)
+            elif output[0] < -0.5: 
+                car.input_steer(left=True)
 
             car.input_gas()
             car.update(map_mask)
             car.check_radar(map_mask)
 
-            # ENHANCED FITNESS FUNCTION
             if car.check_gates(checkpoints):
-                ge[i].fitness += 500  # Big reward for gates (up from 200)
+                ge[i].fitness += 500
 
-            # Reward staying alive
             if car.alive:
                 ge[i].fitness += 1.5
 
-            # Reward speed
             speed_bonus = car.velocity.length() / car.max_speed
-            ge[i].fitness += speed_bonus * 0.8  # Up from 0.05
+            ge[i].fitness += speed_bonus * 0.8
 
-            # Distance to next gate (closer = better)
             dist_score = 1.0 - gps[1] 
             ge[i].fitness += dist_score * 0.1
 
-            # HARSH death penalty
             if not car.alive:
-                ge[i].fitness -= 200  # Up from 50
+                ge[i].fitness -= 200
 
-            # Stuck penalty
             if not car.alive and car.frames_since_gate > 100:
                 ge[i].fitness -= 50
 
-            # HUGE bonus for completing laps
             if car.gates_passed >= len(checkpoints):
-                ge[i].fitness += 3000  # Massive lap completion bonus
+                ge[i].fitness += 3000
 
         for i in range(len(cars) - 1, -1, -1):
             if not cars[i].alive:
@@ -350,13 +344,12 @@ def run_simulation(genomes, config):
         if should_record or frame_count % 10 == 0:
             screen.fill(simulation.COL_BG)
             screen.blit(visual_map, (camera.camera.x, camera.camera.y))
-            for car in cars: car.draw(screen, camera)
+            for car in cars: 
+                car.draw(screen, camera)
 
-            # Use new HUD with error handling
             try:
                 simulation.draw_hud(screen, leader, GENERATION, frame_count, checkpoints, challenge_name)
             except Exception as e:
-                # Fallback to simple text if HUD fails
                 print(f"⚠️  HUD error: {e}, using simple display")
                 font = pygame.font.SysFont("arial", 90, bold=True)
                 gen_text = font.render(f"GEN {GENERATION}", True, (255, 255, 255))
@@ -373,9 +366,10 @@ def run_simulation(genomes, config):
                     pixels = pygame.surfarray.array3d(screen)
                     pixels = np.transpose(pixels, (1, 0, 2))
                     writer.append_data(pixels)
-                except: pass
+                except: 
+                    pass
 
-  if writer: 
+    if writer: 
         writer.close()
         if video_path:
             print(f"✅ Saved recording: {video_path}")
