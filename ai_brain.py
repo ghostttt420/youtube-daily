@@ -234,14 +234,14 @@ def run_simulation(genomes, config):
     map_mask = pygame.mask.from_surface(track_surface)
     camera = simulation.Camera(simulation.WORLD_SIZE, simulation.WORLD_SIZE)
 
-    for _, g in genomes:
+ for _, g in genomes:
         net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
         cars.append(simulation.Car(start_pos, start_angle)) 
         g.fitness = 0
         ge.append(g)
 
-writer = None
+    writer = None
     video_path = None  # Initialize to None
 
     # RECORDING LOGIC:
@@ -252,7 +252,7 @@ writer = None
     is_challenge_start = False
     is_challenge_end = False
     
-if active_challenge:
+    if active_challenge:
         # Consider it "challenge start" if we're within first 5 gens of the challenge
         is_challenge_start = (active_challenge['start_gen'] <= GENERATION <= active_challenge['start_gen'] + 5)
         is_challenge_end = (GENERATION >= active_challenge['target_gen'] - 5)
@@ -278,7 +278,6 @@ if active_challenge:
         writer = imageio.get_writer(video_path, fps=FPS)
     else:
         print(f"⏭️  Skipping recording for Gen {GENERATION}")
-        writer = imageio.get_writer(video_path, fps=FPS)
 
     running = True
     frame_count = 0
