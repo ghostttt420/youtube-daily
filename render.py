@@ -232,6 +232,17 @@ if __name__ == "__main__":
             print(f"📁 File: {output}")
             print(f"📝 Suggested Title: {last_completed['video_hook']}")
             print(f"📝 Suggested Description: AI learns {last_completed['name']} through evolution. Gen {last_completed['start_gen']} → Gen {last_completed['end_gen']}")
+        else:
+            # Challenge completed but clips don't exist - mark as posted and skip
+            print("⚠️  Challenge completed but video clips not available (recorded in earlier sessions)")
+            print("📹 Marking challenge as posted to move on to next challenge")
+            challenge_loader.mark_video_posted(last_completed['id'])
+            
+            # Try creating simple evolution short instead
+            print("\nℹ️  Attempting to create simple evolution short from available clips...")
+            simple_output = create_evolution_short_simple()
+            if simple_output:
+                print(f"✅ Created fallback evolution short: {simple_output}")
     else:
         print("ℹ️  No completed challenges found. Creating simple evolution short...")
         create_evolution_short_simple()
