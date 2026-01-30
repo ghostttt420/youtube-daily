@@ -373,14 +373,6 @@ def run_simulation(genomes, config):
         writer.close()
         if video_path:
             print(f"✅ Saved recording: {video_path}")
-```
-
----
-
-## Why Gen 531 isn't being recorded:
-
-Looking at the output:
-```
 
 
 def run_neat(config_path):
