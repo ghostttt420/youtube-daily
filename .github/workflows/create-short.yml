@@ -32,10 +32,12 @@ jobs:
         pip install -r requirements.txt
     
     - name: Download training clips from artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       continue-on-error: true
       with:
         path: training_clips/
+        pattern: training-clips-*
+        merge-multiple: true
     
     - name: Move clips to correct location
       run: |
@@ -47,8 +49,9 @@ jobs:
         python render.py
     
     - name: Upload short
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: youtube-short-manual
         path: final_shorts/*.mp4
         retention-days: 30
+        if-no-files-found: warn
