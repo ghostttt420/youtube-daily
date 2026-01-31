@@ -2,6 +2,7 @@
   "active_challenge": {
     "id": "drift_master",
     "name": "Drift Master",
+    "car_style": "sport",
     "config_changes": {
       "physics": {
         "friction": 0.92,
