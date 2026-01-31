@@ -152,7 +152,7 @@ def run_dummy_generation():
             if not car.alive: continue
             if random.random() < 0.1: car.steering = random.choice([-1, 0, 1])
             car.input_gas()
-            car.update(map_mask)
+            car.update(map_mask, cars)  # Pass cars for collision detection
         screen.fill(simulation.COL_BG)
         screen.blit(visual_map, (camera.camera.x, camera.camera.y))
         for car in cars: car.draw(screen, camera)
@@ -326,29 +326,56 @@ def run_simulation(genomes, config):
                 car.input_steer(left=True)
 
             car.input_gas()
-            car.update(map_mask)
+            car.update(map_mask, cars)  # Pass cars for collision detection
             car.check_radar(map_mask)
 
+            # === PRO FITNESS FUNCTION ===
+            
+            # Gate passing - major reward
             if car.check_gates(checkpoints):
-                ge[i].fitness += 500
-
+                # Bonus for speed at gate (pros maintain speed)
+                speed_at_gate = car.velocity.length() / car.max_speed
+                gate_bonus = 500 + (speed_at_gate * 200)
+                ge[i].fitness += gate_bonus
+            
+            # Survival bonus (stay alive longer = better)
             if car.alive:
-                ge[i].fitness += 1.5
-
-            speed_bonus = car.velocity.length() / car.max_speed
-            ge[i].fitness += speed_bonus * 0.8
-
-            dist_score = 1.0 - gps[1] 
-            ge[i].fitness += dist_score * 0.1
-
+                ge[i].fitness += 2.0
+            
+            # Speed reward (pros go fast)
+            speed_ratio = car.velocity.length() / car.max_speed
+            ge[i].fitness += speed_ratio * 1.5  # Increased from 0.8
+            
+            # PRO: Smooth steering reward (less jittery = more pro)
+            # Store previous steering to calculate smoothness
+            if not hasattr(car, 'prev_steering'):
+                car.prev_steering = 0
+            steering_change = abs(car.steering - car.prev_steering)
+            if steering_change < 0.3:  # Smooth steering
+                ge[i].fitness += 0.5  # Bonus for smoothness
+            car.prev_steering = car.steering
+            
+            # PRO: Distance to next gate (closer = better)
+            dist_score = max(0, 1.0 - gps[1])
+            ge[i].fitness += dist_score * 0.2
+            
+            # PRO: Heading alignment (facing the right direction)
+            heading_bonus = max(0, 1.0 - abs(gps[0]))  # gps[0] is heading error
+            ge[i].fitness += heading_bonus * 0.3
+            
+            # Death penalty
             if not car.alive:
-                ge[i].fitness -= 200
-
-            if not car.alive and car.frames_since_gate > 100:
-                ge[i].fitness -= 50
-
+                ge[i].fitness -= 150  # Reduced from 200 (less harsh)
+            
+            # Stagnation penalty (not progressing)
+            if car.frames_since_gate > 100:
+                ge[i].fitness -= 30
+            
+            # Lap completion - massive reward
             if car.gates_passed >= len(checkpoints):
-                ge[i].fitness += 3000
+                ge[i].fitness += 5000  # Increased from 3000
+                # Extra bonus for completing lap quickly (pro speed)
+                ge[i].fitness += speed_ratio * 1000
 
         for i in range(len(cars) - 1, -1, -1):
             if not cars[i].alive:
