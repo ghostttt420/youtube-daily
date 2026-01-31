@@ -74,14 +74,21 @@ jobs:
       run: |
         LATEST_CHECKPOINT=$(ls -t neat-checkpoint-* 2>/dev/null | head -1)
         if [ -n "$LATEST_CHECKPOINT" ]; then
-          GENERATION=$(echo $LATEST_CHECKPOINT | grep -oP '\d+')
+          # Extract generation number from filename like "neat-checkpoint-530"
+          GENERATION=$(echo "$LATEST_CHECKPOINT" | sed -n 's/neat-checkpoint-\([0-9]\+\).*/\1/p')
+          # Fallback to regex if sed doesn't match
+          if [ -z "$GENERATION" ]; then
+            GENERATION=$(echo "$LATEST_CHECKPOINT" | grep -oP '\d+$')
+          fi
           echo "CHECKPOINT_FILE=$LATEST_CHECKPOINT" >> $GITHUB_ENV
           echo "GENERATION=$GENERATION" >> $GITHUB_ENV
           echo "checkpoint_exists=true" >> $GITHUB_OUTPUT
+          echo "Detected generation: $GENERATION from $LATEST_CHECKPOINT"
         else
           echo "CHECKPOINT_FILE=none" >> $GITHUB_ENV
           echo "GENERATION=0" >> $GITHUB_ENV
           echo "checkpoint_exists=false" >> $GITHUB_OUTPUT
+          echo "No checkpoint found"
         fi
     
     - name: Upload checkpoint as artifact
@@ -95,8 +102,9 @@ jobs:
     - name: Prepare training clips for upload
       if: always()
       run: |
-        if [ -d "training_clips" ] && [ "$(ls -A training_clips/*.mp4 2>/dev/null)" ]; then
+        if [ -d "training_clips" ] && [ "$(find training_clips -name "*.mp4" | wc -l)" -gt 0 ]; then
           echo "Found training clips to upload"
+          find training_clips -name "*.mp4" -exec echo "  {}" \;
         else
           echo "No training clips found (no milestones hit this run)"
           mkdir -p training_clips
@@ -109,7 +117,7 @@ jobs:
       with:
         name: training-clips-gen-${{ env.GENERATION }}
         path: training_clips/
-        retention-days: 7
+        retention-days: 30
     
     - name: Check if challenge completed
       id: challenge_check
@@ -134,9 +142,10 @@ jobs:
       id: video_check
       if: steps.challenge_check.outputs.challenge_completed == 'true'
       run: |
-        if [ -d "final_shorts" ] && [ "$(ls -A final_shorts/*.mp4 2>/dev/null)" ]; then
+        if [ -d "final_shorts" ] && [ "$(find final_shorts -name "*.mp4" | wc -l)" -gt 0 ]; then
           echo "video_exists=true" >> $GITHUB_OUTPUT
           echo "✅ Video file found"
+          find final_shorts -name "*.mp4" -exec echo "  {}" \;
         else
           echo "video_exists=false" >> $GITHUB_OUTPUT
           echo "❌ No video file found"
@@ -147,7 +156,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: youtube-short-gen-${{ env.GENERATION }}
-        path: final_shorts/*.mp4
+        path: final_shorts/
         retention-days: 30
     
     - name: Upload to YouTube (if video created)
@@ -162,13 +171,20 @@ jobs:
         print(challenge['video_hook'] if challenge else 'AI Evolution Challenge Complete!')
         " 2>/dev/null || echo "AI Evolution Challenge Complete! 🏆")
         
-        python upload.py \
-          --file "final_shorts/*.mp4" \
-          --title "$VIDEO_TITLE #Shorts" \
-          --description "Watch AI learn through evolution! #Shorts #AI #MachineLearning" \
-          --category "28" \
-          --keywords "AI,machine learning,NEAT,evolution,driving" \
-          --privacyStatus "public"
+        # Find the video file
+        VIDEO_FILE=$(find final_shorts -name "*.mp4" | head -1)
+        if [ -n "$VIDEO_FILE" ]; then
+          echo "Uploading video file: $VIDEO_FILE"
+          python upload.py \
+            --file "$VIDEO_FILE" \
+            --title "$VIDEO_TITLE #Shorts" \
+            --description "Watch AI learn through evolution! #Shorts #AI #MachineLearning" \
+            --category "28" \
+            --keywords "AI,machine learning,NEAT,evolution,driving" \
+            --privacyStatus "public"
+        else
+          echo "❌ No video file found for upload"
+        fi
       env:
         YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
         YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
