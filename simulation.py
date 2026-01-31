@@ -133,9 +133,10 @@ class Car:
                 continue
             
             dist = self.position.distance_to(other.position)
-            if dist < collision_distance * 2:  # Cars touching
-                # Calculate bounce
-                collision_normal = (self.position - other.position).normalize()
+            if dist < collision_distance * 2 and dist > 0:  # Cars touching, but not same position
+                # Calculate bounce direction
+                diff = self.position - other.position
+                collision_normal = diff.normalize() if diff.length() > 0 else pygame.math.Vector2(1, 0)
                 
                 # Bounce velocities (funny bumper car effect)
                 bounce_strength = 0.5
