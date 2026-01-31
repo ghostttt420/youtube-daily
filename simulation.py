@@ -285,6 +285,7 @@ class TrackGenerator:
         phys_surf.fill((0,0,0)) 
         vis_surf.fill(COL_BG) 
 
+        # Generate random track points
         points = []
         for i in range(20):
             angle = (i / 20) * 2 * math.pi
@@ -292,56 +293,30 @@ class TrackGenerator:
             points.append((WORLD_SIZE // 2 + radius * math.cos(angle), WORLD_SIZE // 2 + radius * math.sin(angle)))
         points.append(points[0]) 
 
+        # Smooth the track
         pts = np.array(points)
         tck, u = splprep(pts.T, u=None, s=0.0, per=1)
         u_new = np.linspace(u.min(), u.max(), 5000)
         x_new, y_new = splev(u_new, tck, der=0)
         smooth_points = list(zip(x_new, y_new))
-
         checkpoints = smooth_points[::70]
 
-        # Physics mask - wider for collision
+        # Physics collision mask
         pygame.draw.lines(phys_surf, (255, 255, 255), True, smooth_points, 450)
 
-        # === PROPER ASPHALT TRACK ===
-        # Draw with polygons for smooth continuous look
-        wall_color = COL_WALL
-        edge_color = (200, 200, 200)
-        road_color = COL_ROAD
+        # === CLEAN ASPHALT TRACK ===
+        # Simple approach: thick lines with different colors
+        # Outer wall (colorful border)
+        pygame.draw.lines(vis_surf, COL_WALL, True, smooth_points, 250)
         
-        # Create smooth road surface using filled polygons between inner/outer edges
-        # Sample more points for smoothness
-        dense_points = smooth_points[::2]  # Every 2nd point for density
+        # Edge/curb (light gray)
+        pygame.draw.lines(vis_surf, (200, 200, 200), True, smooth_points, 235)
         
-        # Draw WALL (outer area) - thick line
-        pygame.draw.lines(vis_surf, wall_color, True, smooth_points, 260)
+        # Road surface (asphalt color from theme)
+        pygame.draw.lines(vis_surf, COL_ROAD, True, smooth_points, 215)
         
-        # Draw EDGE (curb) - medium thickness
-        pygame.draw.lines(vis_surf, edge_color, True, smooth_points, 240)
-        
-        # Draw ROAD (asphalt) - main surface
-        pygame.draw.lines(vis_surf, road_color, True, smooth_points, 220)
-        
-        # Add asphalt texture/detail - subtle variation
-        for i in range(0, len(smooth_points), 3):
-            p = smooth_points[i]
-            # Slightly darker center line for texture
-            pygame.draw.circle(vis_surf, (min(255, road_color[0]+10), min(255, road_color[1]+10), min(255, road_color[2]+10)), 
-                              (int(p[0]), int(p[1])), 100)
-        
-        # Racing line/center line (subtle)
+        # Center racing line (subtle)
         pygame.draw.lines(vis_surf, COL_CENTER, True, smooth_points, 3)
-        
-        # Tire marks/skid marks (random for realism)
-        import random
-        random.seed(42)  # Consistent marks
-        for _ in range(50):
-            idx = random.randint(0, len(smooth_points)-1)
-            p = smooth_points[idx]
-            offset = random.choice([-80, 80])
-            mark_pos = (int(p[0] + offset), int(p[1] + offset))
-            pygame.draw.ellipse(vis_surf, (road_color[0]-15, road_color[1]-15, road_color[2]-15), 
-                               (mark_pos[0], mark_pos[1], 30, 15))
 
         return (int(x_new[0]), int(y_new[0])), phys_surf, vis_surf, checkpoints, math.degrees(math.atan2(y_new[5]-y_new[0], x_new[5]-x_new[0]))
 
