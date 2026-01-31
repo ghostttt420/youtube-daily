@@ -25,7 +25,7 @@ except:
 
 WIDTH, HEIGHT = 1080, 1920
 WORLD_SIZE = 4000
-SENSOR_LENGTH = THEME.get("sensors", {}).get("length", 300)
+SENSOR_LENGTH = THEME.get("sensors", {}).get("length", 300) if isinstance(THEME.get("sensors"), dict) else 300
 FPS = 30 
 COL_BG = tuple(THEME["visuals"]["bg"])
 COL_WALL = tuple(THEME["visuals"]["wall"])
@@ -63,6 +63,7 @@ class Car:
         self.gates_passed = 0
         self.next_gate_idx = 0
         self.frames_since_gate = 0
+        self.fitness = 0  # For HUD display compatibility
 
         self.radars = [] 
 
@@ -230,7 +231,11 @@ class Camera:
 class TrackGenerator:
     def __init__(self, seed=None):
         if seed is None:
-            seed = THEME.get("map", {}).get("seed", THEME.get("map_seed", 42))
+            map_config = THEME.get("map", {})
+            if isinstance(map_config, dict):
+                seed = map_config.get("seed", THEME.get("map_seed", 42))
+            else:
+                seed = THEME.get("map_seed", 42)
         np.random.seed(seed)
 
     def generate_track(self):
