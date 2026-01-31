@@ -64,9 +64,14 @@ def create_challenge_short(challenge):
     
     clips = []
     
+    # Helper function to find clip using challenge loader
+    def find_clip(gen):
+        challenge_loader = ChallengeLoader()
+        return challenge_loader.get_clip_for_generation(gen)
+    
     # 1. STRUGGLE (First gen of challenge) - 10 seconds
-    struggle_file = f"{VIDEO_DIR}/gen_{start_gen:05d}.mp4"
-    if os.path.exists(struggle_file):
+    struggle_file = find_clip(start_gen)
+    if struggle_file and os.path.exists(struggle_file):
         print(f"📹 Loading struggle clip: Gen {start_gen}")
         struggle = VideoFileClip(struggle_file)
         struggle_duration = min(15, struggle.duration)
@@ -76,30 +81,44 @@ def create_challenge_short(challenge):
         struggle = add_text_overlay(struggle, f"Gen {start_gen} - First Attempt", position='bottom', fontsize=60, color='yellow')
         clips.append(struggle)
     else:
-        print(f"⚠️  Struggle clip not found: {struggle_file}")
+        print(f"⚠️  Struggle clip not found for Gen {start_gen}")
     
     # 2. LEARNING (Mid-point) - 10 seconds
     mid_gen = (start_gen + end_gen) // 2
-    # Find closest recorded gen to mid_gen
-    all_gens = sorted([int(f.split('_')[1].split('.')[0]) for f in glob.glob(f"{VIDEO_DIR}/gen_*.mp4")])
-    if all_gens:
-        closest_mid = min(all_gens, key=lambda x: abs(x - mid_gen))
+    # Find available generations in challenge range
+    challenge_loader = ChallengeLoader()
+    available_clips = challenge_loader.get_clips_for_challenge(challenge_id)
+    
+    if available_clips:
+        # Extract generation numbers from filenames
+        available_gens = []
+        for clip_file in available_clips:
+            gen_num = int(os.path.basename(clip_file).split('_')[1].split('.')[0])
+            if start_gen <= gen_num <= end_gen:
+                available_gens.append(gen_num)
         
-        learning_file = f"{VIDEO_DIR}/gen_{closest_mid:05d}.mp4"
-        if os.path.exists(learning_file):
-            print(f"📹 Loading learning clip: Gen {closest_mid}")
-            learning = VideoFileClip(learning_file)
-            learning_duration = min(14, learning.duration)
-            learning = learning.subclip(0, learning_duration)
-            learning = speedx(learning, 1.4)  # Speed up to ~10s
-            learning = add_text_overlay(learning, f"Gen {closest_mid} - Improving...", position='bottom', fontsize=60, color='yellow')
-            clips.append(learning)
+        if available_gens:
+            closest_mid = min(available_gens, key=lambda x: abs(x - mid_gen))
+            learning_file = challenge_loader.get_clip_for_generation(closest_mid)
+            
+            if learning_file and os.path.exists(learning_file):
+                print(f"📹 Loading learning clip: Gen {closest_mid}")
+                learning = VideoFileClip(learning_file)
+                learning_duration = min(14, learning.duration)
+                learning = learning.subclip(0, learning_duration)
+                learning = speedx(learning, 1.4)  # Speed up to ~10s
+                learning = add_text_overlay(learning, f"Gen {closest_mid} - Improving...", position='bottom', fontsize=60, color='yellow')
+                clips.append(learning)
+            else:
+                print(f"⚠️  Learning clip not found: Gen {closest_mid}")
         else:
-            print(f"⚠️  Learning clip not found: {learning_file}")
+            print(f"⚠️  No clips found in challenge range {start_gen}-{end_gen}")
+    else:
+        print(f"⚠️  No clips found for challenge {challenge_id}")
     
     # 3. MASTERY (Last gen of challenge) - 40 seconds
-    mastery_file = f"{VIDEO_DIR}/gen_{end_gen:05d}.mp4"
-    if os.path.exists(mastery_file):
+    mastery_file = find_clip(end_gen)
+    if mastery_file and os.path.exists(mastery_file):
         print(f"📹 Loading mastery clip: Gen {end_gen}")
         mastery = VideoFileClip(mastery_file)
         mastery_duration = min(40, mastery.duration)
@@ -107,7 +126,7 @@ def create_challenge_short(challenge):
         mastery = add_text_overlay(mastery, f"Gen {end_gen} - MASTERED 🏆", position='top', color='lime')
         clips.append(mastery)
     else:
-        print(f"⚠️  Mastery clip not found: {mastery_file}")
+        print(f"⚠️  Mastery clip not found for Gen {end_gen}")
     
     if len(clips) == 0:
         print("❌ No clips found to create short!")
@@ -155,7 +174,21 @@ def create_evolution_short_simple():
     Simpler version: Just show Gen 1 vs Latest Gen
     Good for when you don't have challenge system set up yet
     """
-    all_gens = sorted(glob.glob(f"{VIDEO_DIR}/gen_*.mp4"))
+    # Search all challenge subdirectories for clips
+    all_gens = []
+    challenge_loader = ChallengeLoader()
+    
+    # Get clips from all challenge directories
+    for challenge_dir in glob.glob(f"{VIDEO_DIR}/*/"):
+        clips = glob.glob(os.path.join(challenge_dir, "gen_*.mp4"))
+        all_gens.extend(clips)
+    
+    # Also check root directory for backward compatibility
+    root_clips = glob.glob(f"{VIDEO_DIR}/gen_*.mp4")
+    all_gens.extend(root_clips)
+    
+    # Sort by generation number
+    all_gens = sorted(all_gens, key=lambda x: int(os.path.basename(x).split('_')[1].split('.')[0]))
     
     if len(all_gens) < 2:
         print("❌ Need at least 2 generations to create evolution short")
@@ -164,10 +197,11 @@ def create_evolution_short_simple():
     gen1_file = all_gens[0]
     latest_file = all_gens[-1]
     
-    gen1_num = int(gen1_file.split('_')[1].split('.')[0])
-    latest_num = int(latest_file.split('_')[1].split('.')[0])
+    gen1_num = int(os.path.basename(gen1_file).split('_')[1].split('.')[0])
+    latest_num = int(os.path.basename(latest_file).split('_')[1].split('.')[0])
     
     print(f"🎬 Creating evolution short: Gen {gen1_num} vs Gen {latest_num}")
+    print(f"📹 Using clips: {os.path.basename(gen1_file)} and {os.path.basename(latest_file)}")
     
     clips = []
     
