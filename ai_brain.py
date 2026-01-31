@@ -254,7 +254,10 @@ def run_simulation(genomes, config):
         is_challenge_end = (GENERATION >= active_challenge['target_gen'] - 5)
     
     is_milestone = (GENERATION % 50 == 0)
-    should_record = is_challenge_start or is_milestone or is_challenge_end
+    # RECORD EVERY GENERATION during daily training for maximum content
+    # We'll pick the best 3 for YouTube, rest gets discarded
+    is_daily_content = True  # Always record for daily compilation
+    should_record = is_challenge_start or is_milestone or is_challenge_end or is_daily_content
     
     # Determine challenge-specific directory
     challenge_name = "training"  # fallback for no challenge
@@ -272,6 +275,7 @@ def run_simulation(genomes, config):
     print(f"   - Storage dir: {challenge_dir}")
     print(f"   - Challenge start: {is_challenge_start}")
     print(f"   - Milestone (÷50): {is_milestone}")
+    print(f"   - Daily content: {is_daily_content}")
     print(f"   - Challenge end: {is_challenge_end}")
     print(f"   - WILL RECORD: {should_record}")
 
