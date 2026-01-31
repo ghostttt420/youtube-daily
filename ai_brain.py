@@ -13,6 +13,7 @@ import json
 import random
 import simulation 
 from challenge_loader import ChallengeLoader
+from themes import ThemeManager
 
 # CONFIG
 DAILY_GENERATIONS = 50  # Increased from 20
@@ -212,16 +213,31 @@ def run_simulation(genomes, config):
         next_challenge = challenge_loader.switch_to_next_challenge(GENERATION)
         if next_challenge:
             challenge_loader.apply_challenge_config(next_challenge)
-            # Reload theme after applying new challenge
-            with open("theme.json", "r") as f:
-                global THEME
-                THEME = json.load(f)
+    
+    # Rotate visual theme every 7 days to keep content fresh
+    theme_manager = ThemeManager()
+    current_day = GENERATION  # Use generation as day counter
+    theme = theme_manager.get_theme_for_day(current_day)
+    theme_manager.apply_theme_to_config(theme)
+    
+    # Reload theme after potential changes
+    with open("theme.json", "r") as f:
+        global THEME
+        THEME = json.load(f)
+        simulation.THEME = THEME  # Update simulation module too
+        # Reload colors
+        simulation.COL_BG = tuple(THEME["visuals"]["bg"])
+        simulation.COL_WALL = tuple(THEME["visuals"]["wall"])
+        simulation.COL_ROAD = tuple(THEME["visuals"]["road"])
+        simulation.COL_CENTER = tuple(THEME["visuals"]["center"])
     
     # Get current challenge info
     active_challenge = challenge_loader.get_active_challenge()
     challenge_name = active_challenge['name'] if active_challenge else None
     
     print(f"\n--- 🏁 Gen {GENERATION} {f'({challenge_name})' if challenge_name else ''} ---")
+    if theme:
+        print(f"🎨 Theme: {theme['name']}")
 
     nets = []
     cars = []
@@ -259,12 +275,17 @@ def run_simulation(genomes, config):
     is_daily_content = True  # Always record for daily compilation
     should_record = is_challenge_start or is_milestone or is_challenge_end or is_daily_content
     
-    # Determine challenge-specific directory
-    challenge_name = "training"  # fallback for no challenge
-    if active_challenge:
-        challenge_name = active_challenge['name'].lower().replace(" ", "_")
+    # Determine challenge info
+    challenge_dir_name = "training"  # fallback directory
+    display_name = None  # For HUD - None means show "Training"
     
-    challenge_dir = os.path.join(VIDEO_OUTPUT_DIR, challenge_name)
+    if active_challenge:
+        challenge_dir_name = active_challenge['name'].lower().replace(" ", "_")
+        # Only show challenge name in HUD if we're in the challenge period
+        if active_challenge['start_gen'] <= GENERATION <= active_challenge['target_gen']:
+            display_name = active_challenge['name']
+    
+    challenge_dir = os.path.join(VIDEO_OUTPUT_DIR, challenge_dir_name)
     if not os.path.exists(challenge_dir):
         os.makedirs(challenge_dir)
     
@@ -273,6 +294,7 @@ def run_simulation(genomes, config):
         print(f"   - Active challenge: {active_challenge['name']}")
         print(f"   - Challenge range: {active_challenge['start_gen']} → {active_challenge['target_gen']}")
     print(f"   - Storage dir: {challenge_dir}")
+    print(f"   - Display name: {display_name or 'Training'}")
     print(f"   - Challenge start: {is_challenge_start}")
     print(f"   - Milestone (÷50): {is_milestone}")
     print(f"   - Daily content: {is_daily_content}")
@@ -390,7 +412,7 @@ def run_simulation(genomes, config):
                 car.draw(screen, camera)
 
             try:
-                simulation.draw_hud(screen, leader, GENERATION, frame_count, checkpoints, challenge_name)
+                simulation.draw_hud(screen, leader, GENERATION, frame_count, checkpoints, display_name)
             except Exception as e:
                 print(f"⚠️  HUD error: {e}, using simple display")
                 font = pygame.font.SysFont("arial", 90, bold=True)
