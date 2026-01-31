@@ -1,278 +1,352 @@
 #!/usr/bin/env python3
 """
-Create daily YouTube Shorts - FIXED VERSION
-Works with 1+ clips, adds proper audio
+Create daily YouTube Shorts - Professional Version
+- 15s Training + 15s Learning + 30s Pro structure
+- Uses existing engine.mp3 and music files
+- Robust error handling
 """
 import os
 import glob
 import random
-import math
+import logging
 from datetime import datetime
-from moviepy.editor import (VideoFileClip, concatenate_videoclips, concatenate_audioclips,
-                            TextClip, CompositeVideoClip, AudioFileClip, CompositeAudioClip,
-                            AudioClip)
+from moviepy.editor import (
+    VideoFileClip, concatenate_videoclips, TextClip, 
+    CompositeVideoClip, AudioFileClip, CompositeAudioClip
+)
 from moviepy.video.fx.all import fadein, fadeout
-from moviepy.audio.AudioClip import AudioArrayClip
-import numpy as np
 from challenge_loader import ChallengeLoader
 from content_strategy import ContentStrategy
 
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 VIDEO_DIR = "training_clips"
 OUTPUT_DIR = "daily_shorts"
+
+# Audio file paths - use existing files
+ENGINE_SOUND = "engine.mp3"
 MUSIC_FILES = ["music.mp3", "music2.mp3", "music3.mp3"]
 
-def generate_engine_sound(duration, fps=44100):
-    """Generate synthetic engine rumble sound"""
-    try:
-        t = np.linspace(0, duration, int(duration * fps), False)
-        
-        # Base engine rumble (low frequency)
-        base_freq = 75
-        rumble = np.sin(2 * np.pi * base_freq * t) * 0.4
-        
-        # Higher rev sound
-        rev = np.sin(2 * np.pi * base_freq * 2 * t) * 0.2
-        
-        # Random noise for texture
-        noise = np.random.uniform(-0.1, 0.1, len(t))
-        
-        # Combine
-        audio = rumble + rev + noise
-        
-        # Fade in/out
-        fade_samples = int(0.1 * fps)
-        if len(audio) > fade_samples * 2:
-            audio[:fade_samples] *= np.linspace(0, 1, fade_samples)
-            audio[-fade_samples:] *= np.linspace(1, 0, fade_samples)
-        
-        # Clip to prevent distortion
-        audio = np.clip(audio, -0.8, 0.8)
-        
-        # Make stereo
-        stereo = np.vstack((audio, audio)).T
-        
-        return AudioArrayClip(stereo, fps=fps)
-    except Exception as e:
-        print(f"⚠️ Engine sound generation failed: {e}")
-        return None
 
 def get_all_clips():
-    """Get all mp4 clips"""
+    """Get all mp4 clips from training_clips directory"""
     pattern = os.path.join(VIDEO_DIR, "**", "*.mp4")
     clips = glob.glob(pattern, recursive=True)
     
     def get_gen(filename):
         try:
-            return int(os.path.basename(filename).split('_')[1].split('.')[0])
-        except:
+            basename = os.path.basename(filename)
+            # Extract number from gen_00531.mp4
+            num_part = basename.split('_')[1].split('.')[0]
+            return int(num_part)
+        except (IndexError, ValueError):
             return 0
     
     return sorted(clips, key=get_gen)
 
-def analyze_clip(video_path):
-    """Get clip duration as quality metric"""
+
+def get_clip_duration(video_path):
+    """Get duration of a video clip"""
     try:
         clip = VideoFileClip(video_path)
-        dur = clip.duration
+        duration = clip.duration
         clip.close()
-        return dur
-    except:
+        return duration
+    except Exception as e:
+        logger.warning(f"Could not get duration for {video_path}: {e}")
         return 0
 
-def add_text(clip, main_text, sub_text, color):
-    """Add clean text overlay"""
-    try:
-        # Main text
-        txt = TextClip(
-            main_text,
-            fontsize=55,
-            color=color,
-            font='Arial-Bold',
-            stroke_color='black',
-            stroke_width=2,
-            method='caption',
-            size=(clip.w - 60, None)
-        ).set_duration(clip.duration).set_position(('center', 25))
-        
-        # Sub text
-        sub = TextClip(
-            sub_text,
-            fontsize=30,
-            color='#CCCCCC',
-            font='Arial',
-            stroke_color='black',
-            stroke_width=1
-        ).set_duration(clip.duration).set_position(('center', clip.h - 60))
-        
-        return CompositeVideoClip([clip, txt, sub])
-    except Exception as e:
-        print(f"⚠️ Text error: {e}")
-        return clip
 
-def process_clip(clip_path, duration, caption, color, add_engine=True):
-    """Process a single clip with audio and text"""
+def load_audio_files(duration):
+    """
+    Load and prepare audio from existing mp3 files.
+    Returns a CompositeAudioClip with engine + music mixed.
+    """
+    audio_clips = []
+    
+    # 1. Add engine sound - loop if necessary
+    if os.path.exists(ENGINE_SOUND):
+        try:
+            engine = AudioFileClip(ENGINE_SOUND)
+            # Loop engine sound to match video duration
+            if engine.duration < duration:
+                loops = int(duration / engine.duration) + 1
+                from moviepy.editor import concatenate_audioclips
+                engine_loops = [engine] * loops
+                engine = concatenate_audioclips(engine_loops)
+            # Trim to exact duration
+            engine = engine.subclip(0, duration)
+            # Engine at 35% volume
+            audio_clips.append(engine.volumex(0.35))
+            logger.info(f"Added engine sound: {ENGINE_SOUND}")
+        except Exception as e:
+            logger.warning(f"Could not load engine sound: {e}")
+    else:
+        logger.warning(f"Engine sound not found: {ENGINE_SOUND}")
+    
+    # 2. Add background music - pick random, loop if needed
+    available_music = [m for m in MUSIC_FILES if os.path.exists(m)]
+    if available_music:
+        try:
+            music_file = random.choice(available_music)
+            music = AudioFileClip(music_file)
+            # Loop music to match video duration
+            if music.duration < duration:
+                loops = int(duration / music.duration) + 1
+                from moviepy.editor import concatenate_audioclips
+                music_loops = [music] * loops
+                music = concatenate_audioclips(music_loops)
+            # Trim to exact duration
+            music = music.subclip(0, duration)
+            # Music at 20% volume (background)
+            audio_clips.append(music.volumex(0.20))
+            logger.info(f"Added music: {music_file}")
+        except Exception as e:
+            logger.warning(f"Could not load music: {e}")
+    else:
+        logger.warning("No music files found")
+    
+    if audio_clips:
+        return CompositeAudioClip(audio_clips)
+    return None
+
+
+def create_segment(clip_path, target_duration, caption, color_hex, day_num):
+    """
+    Create a video segment with text overlay and audio.
+    
+    Args:
+        clip_path: Path to source video
+        target_duration: Desired duration in seconds
+        caption: Text to display
+        color_hex: Color for the caption text
+        day_num: Day number for display
+    
+    Returns:
+        Processed VideoFileClip or None on error
+    """
     if not clip_path or not os.path.exists(clip_path):
+        logger.error(f"Clip not found: {clip_path}")
         return None
     
     try:
-        # Load and trim/pad
+        logger.info(f"Processing segment: {os.path.basename(clip_path)} -> {target_duration}s")
+        
+        # Load the clip
         clip = VideoFileClip(clip_path)
         
-        if clip.duration > duration:
-            clip = clip.subclip(0, duration)
-        elif clip.duration < duration:
+        # Handle duration - trim or loop to match target
+        if clip.duration > target_duration:
+            # Trim to target duration
+            clip = clip.subclip(0, target_duration)
+            logger.info(f"  Trimmed from {clip.duration:.1f}s to {target_duration}s")
+        elif clip.duration < target_duration:
             # Loop to fill duration
-            loops = int(duration / max(clip.duration, 1)) + 1
-            clip = concatenate_videoclips([clip] * loops).subclip(0, duration)
+            loops_needed = int(target_duration / clip.duration) + 1
+            logger.info(f"  Looping {loops_needed}x to reach {target_duration}s")
+            from moviepy.editor import concatenate_videoclips
+            clip = concatenate_videoclips([clip] * loops_needed)
+            clip = clip.subclip(0, target_duration)
         
-        # Add text
-        clip = add_text(clip, caption, "", color)
+        # Add caption text
+        try:
+            # Main caption at top
+            txt_clip = TextClip(
+                caption,
+                fontsize=50,
+                color=color_hex,
+                font='DejaVu-Sans-Bold',
+                stroke_color='black',
+                stroke_width=2,
+                method='caption',
+                size=(clip.w - 40, None)
+            ).set_duration(clip.duration).set_position(('center', 20))
+            
+            # Day info at bottom
+            day_clip = TextClip(
+                f"Day {day_num}",
+                fontsize=35,
+                color='#CCCCCC',
+                font='DejaVu-Sans',
+                stroke_color='black',
+                stroke_width=1
+            ).set_duration(clip.duration).set_position(('center', clip.h - 70))
+            
+            # Composite text over video
+            clip = CompositeVideoClip([clip, txt_clip, day_clip])
+            logger.info(f"  Added text overlays")
+        except Exception as e:
+            logger.warning(f"  Could not add text: {e}")
         
         # Add audio
-        audio_clips = []
-        
-        if add_engine:
-            engine = generate_engine_sound(clip.duration)
-            if engine:
-                audio_clips.append(engine.volumex(0.3))
-        
-        # Background music
-        music_file = None
-        for m in MUSIC_FILES:
-            if os.path.exists(m):
-                music_file = m
-                break
-        
-        if music_file:
-            try:
-                music = AudioFileClip(music_file).subclip(0, clip.duration)
-                audio_clips.append(music.volumex(0.15))
-            except:
-                pass
-        
-        if audio_clips:
-            mixed = CompositeAudioClip(audio_clips)
-            clip = clip.set_audio(mixed)
+        audio = load_audio_files(clip.duration)
+        if audio:
+            clip = clip.set_audio(audio)
+            logger.info(f"  Added audio mix")
         
         return clip
         
     except Exception as e:
-        print(f"⚠️ Clip processing error: {e}")
+        logger.error(f"Failed to process segment: {e}")
         return None
 
+
 def create_triple_short(clips, strategy, output_name):
-    """Create 15s + 15s + 30s video"""
+    """
+    Create the 15s + 15s + 30s triple short.
     
+    Structure:
+    - 15s: Training (struggle/fails) - RED
+    - 15s: Learning (improving) - YELLOW  
+    - 30s: Pro (mastery) - GREEN
+    """
     if not clips:
-        print("❌ No clips available")
+        logger.error("No clips provided")
         return None
     
-    print(f"🎬 Creating triple-short with {len(clips)} clip(s)")
+    logger.info(f"Creating triple-short from {len(clips)} clip(s)")
     
-    day = strategy['day']
-    challenge = strategy['challenge']
+    day = strategy.get('day', 1)
     
-    # If only 1 clip, use it for all segments
-    # If 2+ clips, use worst/best
-    # If 3+ clips, use worst/middle/best
-    
+    # Select clips based on performance (duration = survival time)
     if len(clips) == 1:
+        # Use same clip for all segments
         worst = middle = best = clips[0]
+        logger.info("Using single clip for all segments")
     elif len(clips) == 2:
-        scored = [(c, analyze_clip(c)) for c in clips]
-        scored.sort(key=lambda x: x[1])
-        worst = scored[0][0]
-        middle = best = scored[1][0]
+        # Use first as worst, second as best
+        worst = clips[0]
+        middle = best = clips[1]
+        logger.info("Using 2 clips: worst and best")
     else:
-        scored = [(c, analyze_clip(c)) for c in clips]
-        scored.sort(key=lambda x: x[1])
+        # Score by duration and pick worst/middle/best
+        scored = [(c, get_clip_duration(c)) for c in clips]
+        scored.sort(key=lambda x: x[1])  # Sort by duration (worst first)
+        
         worst = scored[0][0]
-        middle = scored[len(scored)//2][0]
+        middle = scored[len(scored) // 2][0]
         best = scored[-1][0]
+        logger.info(f"Selected clips: worst={scored[0][1]:.1f}s, mid={scored[len(scored)//2][1]:.1f}s, best={scored[-1][1]:.1f}s")
     
     segments = []
     
-    # Training segment (15s) - RED
-    s1 = process_clip(worst, 15, f"🎓 TRAINING Day {day}", '#FF4444')
-    if s1: segments.append(s1)
+    # Segment 1: Training (15s) - Red
+    logger.info("Creating TRAINING segment (15s)...")
+    seg1 = create_segment(worst, 15, "TRAINING 💀", "#FF4444", day)
+    if seg1:
+        segments.append(seg1)
     
-    # Learning segment (15s) - YELLOW  
-    s2 = process_clip(middle, 15, f"📈 LEARNING Day {day}", '#FFAA00')
-    if s2: segments.append(s2)
+    # Segment 2: Learning (15s) - Yellow
+    logger.info("Creating LEARNING segment (15s)...")
+    seg2 = create_segment(middle, 15, "LEARNING 📈", "#FFAA00", day)
+    if seg2:
+        segments.append(seg2)
     
-    # Pro segment (30s) - GREEN
-    s3 = process_clip(best, 30, f"🏆 PRO Day {day}", '#44FF88')
-    if s3: segments.append(s3)
+    # Segment 3: Pro (30s) - Green
+    logger.info("Creating PRO segment (30s)...")
+    seg3 = create_segment(best, 30, "PRO LEVEL 🏆", "#44FF88", day)
+    if seg3:
+        segments.append(seg3)
     
     if not segments:
+        logger.error("No segments were created successfully")
         return None
     
-    # Combine
-    final = concatenate_videoclips(segments)
-    final = fadein(final, 0.3)
-    final = fadeout(final, 0.5)
+    # Concatenate all segments
+    logger.info(f"Concatenating {len(segments)} segments...")
+    final = concatenate_videoclips(segments, method="compose")
     
-    # Export
+    # Add fade in/out
+    final = fadein(final, 0.5)
+    final = fadeout(final, 0.8)
+    
+    # Ensure output directory exists
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     output_path = os.path.join(OUTPUT_DIR, output_name)
     
-    print(f"💾 Exporting {output_path} ({final.duration:.1f}s)")
+    logger.info(f"Exporting to {output_path} ({final.duration:.1f}s total)")
     
+    # Export with high quality settings
     final.write_videofile(
         output_path,
         fps=30,
         codec='libx264',
         audio_codec='aac',
-        bitrate='3000k',
+        audio_bitrate='192k',
+        bitrate='4000k',
         preset='medium',
         threads=4,
         logger=None
     )
     
     # Cleanup
-    for s in segments:
-        s.close()
+    for seg in segments:
+        seg.close()
     final.close()
     
-    print(f"✅ Created: {output_path}")
+    logger.info(f"✅ Successfully created: {output_path}")
     return output_path
 
+
 def main():
-    print("=" * 60)
-    print("🎬 DAILY SHORTS CREATOR")
-    print("=" * 60)
+    """Main entry point"""
+    logger.info("=" * 60)
+    logger.info("🎬 DAILY SHORTS CREATOR - PROFESSIONAL")
+    logger.info("=" * 60)
     
-    # Get strategy
+    # Get content strategy
     content = ContentStrategy()
     strategy = content.get_today_strategy()
     
+    # Get challenge info
     loader = ChallengeLoader()
     challenge = loader.get_active_challenge()
     challenge_name = challenge['name'] if challenge else "Training"
-    content.update_challenge(challenge_name, strategy['day'])
+    content.update_challenge(challenge_name, strategy.get('day', 1))
     
     strategy['challenge'] = challenge_name
     
-    print(f"\n📅 Day {strategy['day']} | {challenge_name}")
+    logger.info(f"Day {strategy['day']} | Challenge: {challenge_name}")
     
-    # Get clips
+    # Check for audio files
+    logger.info("Checking audio files...")
+    if os.path.exists(ENGINE_SOUND):
+        logger.info(f"  ✓ Engine: {ENGINE_SOUND}")
+    else:
+        logger.warning(f"  ✗ Engine not found: {ENGINE_SOUND}")
+    
+    available_music = [m for m in MUSIC_FILES if os.path.exists(m)]
+    logger.info(f"  ✓ Music files: {available_music}")
+    
+    # Get training clips
     clips = get_all_clips()
-    print(f"📹 Found {len(clips)} clip(s)")
+    logger.info(f"Found {len(clips)} training clip(s)")
     
     if not clips:
-        print("❌ No clips to process")
+        logger.error("No clips found. Cannot create video.")
         return
     
-    # Create triple short
+    # Create the triple short
     today = datetime.now().strftime('%Y%m%d')
     output = create_triple_short(clips, strategy, f"daily_{today}.mp4")
     
     if output:
-        print(f"\n✅ Success! Video created.")
+        logger.info(f"\n✅ SUCCESS: Video created at {output}")
+        # Save upload info
+        schedule_path = os.path.join(OUTPUT_DIR, "upload_info.txt")
+        with open(schedule_path, "w") as f:
+            f.write(f"Video: {output}\n")
+            f.write(f"Day: {strategy['day']}\n")
+            f.write(f"Challenge: {challenge_name}\n")
+        logger.info(f"Upload info saved to {schedule_path}")
     else:
-        print("\n❌ Failed to create video")
+        logger.error("\n❌ FAILED: Could not create video")
     
+    # Advance to next day
     content.advance_day()
+
 
 if __name__ == "__main__":
     main()
