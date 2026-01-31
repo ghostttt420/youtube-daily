@@ -193,13 +193,14 @@ def draw_basic_hud(screen, leader, generation, frame_count, checkpoints, challen
     frame_text = font.render(f"Frame: {frame_count}", True, (255, 255, 255))
     screen.blit(frame_text, (20, 140))
     
-    # Draw simple fitness indicator
+    # Draw simple fitness indicator (use gates * 100 + distance as proxy)
     fitness_bar_width = 200
-    fitness_fill = min(leader.fitness * 2, fitness_bar_width)  # Scale fitness to bar width
+    estimated_fitness = leader.gates_passed * 500 + leader.distance_traveled * 0.1
+    fitness_fill = min(estimated_fitness / 10, fitness_bar_width)  # Scale to bar width
     pygame.draw.rect(screen, (100, 100, 100), (20, 180, fitness_bar_width, 20))
     pygame.draw.rect(screen, (0, 255, 0), (20, 180, int(fitness_fill), 20))
     
-    fitness_text = font.render(f"Fitness: {int(leader.fitness)}", True, (255, 255, 255))
+    fitness_text = font.render(f"Est. Fitness: {int(estimated_fitness)}", True, (255, 255, 255))
     screen.blit(fitness_text, (20, 210))
 
 def run_simulation(genomes, config):
@@ -255,10 +256,20 @@ def run_simulation(genomes, config):
     is_milestone = (GENERATION % 50 == 0)
     should_record = is_challenge_start or is_milestone or is_challenge_end
     
+    # Determine challenge-specific directory
+    challenge_name = "training"  # fallback for no challenge
+    if active_challenge:
+        challenge_name = active_challenge['name'].lower().replace(" ", "_")
+    
+    challenge_dir = os.path.join(VIDEO_OUTPUT_DIR, challenge_name)
+    if not os.path.exists(challenge_dir):
+        os.makedirs(challenge_dir)
+    
     print(f"📹 Recording check - Gen {GENERATION}:")
     if active_challenge:
         print(f"   - Active challenge: {active_challenge['name']}")
         print(f"   - Challenge range: {active_challenge['start_gen']} → {active_challenge['target_gen']}")
+    print(f"   - Storage dir: {challenge_dir}")
     print(f"   - Challenge start: {is_challenge_start}")
     print(f"   - Milestone (÷50): {is_milestone}")
     print(f"   - Challenge end: {is_challenge_end}")
@@ -266,7 +277,7 @@ def run_simulation(genomes, config):
 
     if should_record:
         filename = f"gen_{GENERATION:05d}.mp4"
-        video_path = os.path.join(VIDEO_OUTPUT_DIR, filename)
+        video_path = os.path.join(challenge_dir, filename)
         print(f"🎥 Recording Gen {GENERATION} to {video_path}...")
         writer = imageio.get_writer(video_path, fps=FPS)
     else:
@@ -378,10 +389,9 @@ def run_simulation(genomes, config):
 def run_neat(config_path):
     global GENERATION, START_GEN, FINAL_GEN
 
-    # 1. Clear OLD clips
-    for f in glob.glob(os.path.join(VIDEO_OUTPUT_DIR, "*.mp4")):
-        try: os.remove(f)
-        except: pass
+    # 1. Ensure training clips directory exists (persistent storage)
+    if not os.path.exists(VIDEO_OUTPUT_DIR): 
+        os.makedirs(VIDEO_OUTPUT_DIR)
 
     # 2. Check for brain history
     checkpoints = [f for f in os.listdir(".") if f.startswith("neat-checkpoint-")]
