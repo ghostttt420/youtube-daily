@@ -5,6 +5,7 @@ import json
 import random 
 import numpy as np
 from scipy.interpolate import splprep, splev
+from scipy.spatial.distance import cdist
 
 # --- LOAD THEME ---
 try:
@@ -40,6 +41,7 @@ def load_sprite(filename, scale_size=None):
     if scale_size:
         img = pygame.transform.scale(img, scale_size)
     return img
+
 
 class Car:
     def __init__(self, start_pos, start_angle):
@@ -156,7 +158,7 @@ class Car:
                 for _ in range(3):
                     mid_point = (self.position + other.position) / 2
                     self.particles.append([mid_point, random.randint(10, 20)])
-    
+
     def update(self, map_mask, other_cars=None):
         if not self.alive: return
         self.frames_since_gate += 1
@@ -245,6 +247,7 @@ class Car:
                 s.set_alpha(int((life/20)*150))
                 screen.blit(s, (adj[0]-16, adj[1]-16))
 
+
 class Camera:
     def __init__(self, width, height):
         self.camera = pygame.Rect(0, 0, width, height)
@@ -268,6 +271,7 @@ class Camera:
 
         self.camera = pygame.Rect(int(self.exact_x), int(self.exact_y), self.width, self.height)
 
+
 class TrackGenerator:
     def __init__(self, seed=None):
         if seed is None:
@@ -279,44 +283,106 @@ class TrackGenerator:
         np.random.seed(seed)
 
     def generate_track(self):
+        """Generate track with proper asphalt rendering using polygons"""
         phys_surf = pygame.Surface((WORLD_SIZE, WORLD_SIZE))
         vis_surf = pygame.Surface((WORLD_SIZE, WORLD_SIZE))
 
         phys_surf.fill((0,0,0)) 
         vis_surf.fill(COL_BG) 
 
-        # Generate random track points
+        # Generate control points for the track
         points = []
-        for i in range(20):
-            angle = (i / 20) * 2 * math.pi
-            radius = np.random.randint(1100, 1800)
-            points.append((WORLD_SIZE // 2 + radius * math.cos(angle), WORLD_SIZE // 2 + radius * math.sin(angle)))
-        points.append(points[0]) 
+        num_points = 20
+        for i in range(num_points):
+            angle = (i / num_points) * 2 * math.pi
+            # Varying radius for interesting track shape
+            base_radius = 1400
+            variation = np.random.randint(-300, 300)
+            radius = base_radius + variation
+            points.append((
+                WORLD_SIZE // 2 + radius * math.cos(angle),
+                WORLD_SIZE // 2 + radius * math.sin(angle)
+            ))
+        points.append(points[0])  # Close the loop
 
-        # Smooth the track
+        # Create smooth spline
         pts = np.array(points)
         tck, u = splprep(pts.T, u=None, s=0.0, per=1)
-        u_new = np.linspace(u.min(), u.max(), 5000)
+        u_new = np.linspace(u.min(), u.max(), 2000)  # More points for smoother curves
         x_new, y_new = splev(u_new, tck, der=0)
         smooth_points = list(zip(x_new, y_new))
-        checkpoints = smooth_points[::70]
+        
+        # Calculate checkpoints
+        checkpoints = smooth_points[::(len(smooth_points)//12)]  # ~12 checkpoints
 
-        # Physics collision mask
-        pygame.draw.lines(phys_surf, (255, 255, 255), True, smooth_points, 450)
+        # === PROPER ASPHALT TRACK RENDERING ===
+        # Calculate inner and outer track boundaries
+        track_width = 180  # Total track width
+        inner_points = []
+        outer_points = []
+        
+        for i in range(len(smooth_points)):
+            # Get current point and next point for tangent
+            p1 = pygame.math.Vector2(smooth_points[i])
+            p2 = pygame.math.Vector2(smooth_points[(i+1) % len(smooth_points)])
+            
+            # Calculate perpendicular direction
+            tangent = p2 - p1
+            if tangent.length() > 0:
+                tangent = tangent.normalize()
+                normal = pygame.math.Vector2(-tangent.y, tangent.x)
+            else:
+                normal = pygame.math.Vector2(0, 1)
+            
+            # Inner and outer points
+            inner = p1 - normal * (track_width / 2)
+            outer = p1 + normal * (track_width / 2)
+            inner_points.append((int(inner.x), int(inner.y)))
+            outer_points.append((int(outer.x), int(outer.y)))
 
-        # === CLEAN ASPHALT TRACK ===
-        # Simple approach: thick lines with different colors
-        # Outer wall (colorful border)
-        pygame.draw.lines(vis_surf, COL_WALL, True, smooth_points, 250)
+        # Create physics mask (inner area is drivable)
+        pygame.draw.polygon(phys_surf, (255, 255, 255), inner_points)
+
+        # Draw visual track
+        # 1. Draw grass/outer area
+        # (already filled with background color)
         
-        # Edge/curb (light gray)
-        pygame.draw.lines(vis_surf, (200, 200, 200), True, smooth_points, 235)
+        # 2. Draw outer wall/barrier
+        wall_width = 20
+        pygame.draw.polygon(vis_surf, COL_WALL, outer_points)
         
-        # Road surface (asphalt color from theme)
-        pygame.draw.lines(vis_surf, COL_ROAD, True, smooth_points, 215)
+        # 3. Draw curb/edge
+        curb_points = []
+        for i in range(len(smooth_points)):
+            p1 = pygame.math.Vector2(smooth_points[i])
+            p2 = pygame.math.Vector2(smooth_points[(i+1) % len(smooth_points)])
+            tangent = p2 - p1
+            if tangent.length() > 0:
+                tangent = tangent.normalize()
+                normal = pygame.math.Vector2(-tangent.y, tangent.x)
+            else:
+                normal = pygame.math.Vector2(0, 1)
+            curb = p1 + normal * (track_width / 2 - 10)
+            curb_points.append((int(curb.x), int(curb.y)))
         
-        # Center racing line (subtle)
-        pygame.draw.lines(vis_surf, COL_CENTER, True, smooth_points, 3)
+        # Draw curbs (red and white alternating)
+        curb_segment_length = len(curb_points) // 20
+        for i in range(0, len(curb_points), curb_segment_length):
+            segment = curb_points[i:i+curb_segment_length]
+            color = (220, 20, 60) if (i // curb_segment_length) % 2 == 0 else (255, 255, 255)
+            if len(segment) > 2:
+                pygame.draw.polygon(vis_surf, color, segment)
+        
+        # 4. Draw asphalt road
+        pygame.draw.polygon(vis_surf, COL_ROAD, inner_points)
+        
+        # 5. Draw center racing line (dashed)
+        dash_length = len(smooth_points) // 30
+        for i in range(0, len(smooth_points), dash_length * 2):
+            segment = smooth_points[i:i+dash_length]
+            if len(segment) > 1:
+                pts = [(int(p[0]), int(p[1])) for p in segment]
+                pygame.draw.lines(vis_surf, COL_CENTER, False, pts, 4)
 
         return (int(x_new[0]), int(y_new[0])), phys_surf, vis_surf, checkpoints, math.degrees(math.atan2(y_new[5]-y_new[0], x_new[5]-x_new[0]))
 
@@ -340,7 +406,7 @@ def draw_text_with_outline(screen, text, pos, size=100, color=(255,255,255), out
 def draw_hud(screen, car, generation, frame_count, checkpoints, challenge_name=None):
     """Draw dynamic HUD that tells a story"""
     
-    # Challenge name (top center)
+    # Challenge name (top center) - only show if in active challenge
     if challenge_name:
         draw_text_with_outline(
             screen, 
