@@ -65,6 +65,13 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
+    - name: Generate car assets for theme
+      run: |
+        echo "🎨 Generating car sprites for current theme..."
+        xvfb-run -a python assets.py
+        echo "✅ Assets generated"
+        ls -la assets/
+    
     - name: Run training
       run: |
         xvfb-run -a python ai_brain.py
