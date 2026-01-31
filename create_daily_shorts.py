@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """
-Create daily YouTube Shorts with 15s/15s/30s structure
-15s Training (struggle) + 15s Learning (progress) + 30s Pro (mastery)
+Create daily YouTube Shorts - FIXED VERSION
+Works with 1+ clips, adds proper audio
 """
 import os
 import glob
 import random
-import numpy as np
+import math
 from datetime import datetime
 from moviepy.editor import (VideoFileClip, concatenate_videoclips, concatenate_audioclips,
-                            TextClip, CompositeVideoClip, AudioFileClip, CompositeAudioClip)
+                            TextClip, CompositeVideoClip, AudioFileClip, CompositeAudioClip,
+                            AudioClip)
 from moviepy.video.fx.all import fadein, fadeout
 from moviepy.audio.AudioClip import AudioArrayClip
+import numpy as np
 from challenge_loader import ChallengeLoader
 from content_strategy import ContentStrategy
 
@@ -20,30 +22,42 @@ OUTPUT_DIR = "daily_shorts"
 MUSIC_FILES = ["music.mp3", "music2.mp3", "music3.mp3"]
 
 def generate_engine_sound(duration, fps=44100):
-    """Generate synthetic engine sound (since training clips have no audio)"""
+    """Generate synthetic engine rumble sound"""
     try:
-        t = np.linspace(0, duration, int(duration * fps))
-        # Engine rumble: low frequency with modulation
-        base_freq = 80  # Hz
-        rumble = np.sin(2 * np.pi * base_freq * t) * 0.3
-        # Add higher harmonics
-        harmonic = np.sin(2 * np.pi * base_freq * 2 * t) * 0.15
-        # Add noise for texture
-        noise = np.random.normal(0, 0.05, len(t))
+        t = np.linspace(0, duration, int(duration * fps), False)
+        
+        # Base engine rumble (low frequency)
+        base_freq = 75
+        rumble = np.sin(2 * np.pi * base_freq * t) * 0.4
+        
+        # Higher rev sound
+        rev = np.sin(2 * np.pi * base_freq * 2 * t) * 0.2
+        
+        # Random noise for texture
+        noise = np.random.uniform(-0.1, 0.1, len(t))
+        
         # Combine
-        audio = rumble + harmonic + noise
+        audio = rumble + rev + noise
+        
         # Fade in/out
-        fade_len = int(0.1 * fps)
-        audio[:fade_len] *= np.linspace(0, 1, fade_len)
-        audio[-fade_len:] *= np.linspace(1, 0, fade_len)
-        # Stereo
-        audio = np.array([audio, audio]).T
-        return AudioArrayClip(audio, fps=fps)
-    except:
+        fade_samples = int(0.1 * fps)
+        if len(audio) > fade_samples * 2:
+            audio[:fade_samples] *= np.linspace(0, 1, fade_samples)
+            audio[-fade_samples:] *= np.linspace(1, 0, fade_samples)
+        
+        # Clip to prevent distortion
+        audio = np.clip(audio, -0.8, 0.8)
+        
+        # Make stereo
+        stereo = np.vstack((audio, audio)).T
+        
+        return AudioArrayClip(stereo, fps=fps)
+    except Exception as e:
+        print(f"⚠️ Engine sound generation failed: {e}")
         return None
 
 def get_all_clips():
-    """Get all mp4 clips from training_clips"""
+    """Get all mp4 clips"""
     pattern = os.path.join(VIDEO_DIR, "**", "*.mp4")
     clips = glob.glob(pattern, recursive=True)
     
@@ -55,158 +69,161 @@ def get_all_clips():
     
     return sorted(clips, key=get_gen)
 
-def analyze_clip_performance(video_path):
-    """Score clip by performance (duration = survival time)"""
+def analyze_clip(video_path):
+    """Get clip duration as quality metric"""
     try:
         clip = VideoFileClip(video_path)
-        duration = clip.duration
+        dur = clip.duration
         clip.close()
-        return duration
+        return dur
     except:
         return 0
 
-def add_caption(clip, text, position='top', fontsize=60, color='#FFFFFF'):
-    """Add clean caption text"""
+def add_text(clip, main_text, sub_text, color):
+    """Add clean text overlay"""
     try:
+        # Main text
         txt = TextClip(
-            text,
-            fontsize=fontsize,
+            main_text,
+            fontsize=55,
             color=color,
             font='Arial-Bold',
             stroke_color='black',
             stroke_width=2,
             method='caption',
-            size=(clip.w - 80, None)
-        ).set_duration(clip.duration)
+            size=(clip.w - 60, None)
+        ).set_duration(clip.duration).set_position(('center', 25))
         
-        if position == 'top':
-            txt = txt.set_position(('center', 30))
-        elif position == 'bottom':
-            txt = txt.set_position(('center', clip.h - 100))
-        else:
-            txt = txt.set_position('center')
+        # Sub text
+        sub = TextClip(
+            sub_text,
+            fontsize=30,
+            color='#CCCCCC',
+            font='Arial',
+            stroke_color='black',
+            stroke_width=1
+        ).set_duration(clip.duration).set_position(('center', clip.h - 60))
         
-        return CompositeVideoClip([clip, txt])
-    except:
+        return CompositeVideoClip([clip, txt, sub])
+    except Exception as e:
+        print(f"⚠️ Text error: {e}")
         return clip
 
-def create_segment(clip_path, duration, caption, color, add_engine=True):
-    """Create a video segment with audio"""
+def process_clip(clip_path, duration, caption, color, add_engine=True):
+    """Process a single clip with audio and text"""
     if not clip_path or not os.path.exists(clip_path):
         return None
     
     try:
+        # Load and trim/pad
         clip = VideoFileClip(clip_path)
         
-        # Trim/pad to exact duration
         if clip.duration > duration:
             clip = clip.subclip(0, duration)
         elif clip.duration < duration:
-            # Loop if too short
-            loops = int(duration / clip.duration) + 1
+            # Loop to fill duration
+            loops = int(duration / max(clip.duration, 1)) + 1
             clip = concatenate_videoclips([clip] * loops).subclip(0, duration)
         
-        # Add caption
-        clip = add_caption(clip, caption, color=color)
+        # Add text
+        clip = add_text(clip, caption, "", color)
         
         # Add audio
-        audio_layers = []
+        audio_clips = []
         
-        # Engine sound
         if add_engine:
-            engine = generate_engine_sound(duration)
+            engine = generate_engine_sound(clip.duration)
             if engine:
-                audio_layers.append(engine.volumex(0.25))
+                audio_clips.append(engine.volumex(0.3))
         
         # Background music
-        music_file = random.choice([m for m in MUSIC_FILES if os.path.exists(m)])
-        if music_file and os.path.exists(music_file):
+        music_file = None
+        for m in MUSIC_FILES:
+            if os.path.exists(m):
+                music_file = m
+                break
+        
+        if music_file:
             try:
-                music = AudioFileClip(music_file).subclip(0, duration)
-                audio_layers.append(music.volumex(0.15))
+                music = AudioFileClip(music_file).subclip(0, clip.duration)
+                audio_clips.append(music.volumex(0.15))
             except:
                 pass
         
-        if audio_layers:
-            mixed = CompositeAudioClip(audio_layers)
+        if audio_clips:
+            mixed = CompositeAudioClip(audio_clips)
             clip = clip.set_audio(mixed)
         
         return clip
         
     except Exception as e:
-        print(f"⚠️ Segment error: {e}")
+        print(f"⚠️ Clip processing error: {e}")
         return None
 
-def create_triple_short(strategy, clips, output_name):
-    """
-    Create the 15s/15s/30s structure:
-    - 15s: Training (struggle/chaos)
-    - 15s: Learning (progress/improving)  
-    - 30s: Pro (mastery/perfection)
-    """
-    if len(clips) < 3:
-        print(f"❌ Need 3+ clips, got {len(clips)}")
+def create_triple_short(clips, strategy, output_name):
+    """Create 15s + 15s + 30s video"""
+    
+    if not clips:
+        print("❌ No clips available")
         return None
     
-    print(f"🎬 Creating Triple-Short: {output_name}")
-    
-    # Sort by performance
-    scored = [(c, analyze_clip_performance(c)) for c in clips]
-    scored.sort(key=lambda x: x[1])
-    
-    n = len(scored)
-    training_clip = scored[0][0]  # Worst
-    learning_clip = scored[n//2][0]  # Middle
-    pro_clip = scored[-1][0]  # Best
+    print(f"🎬 Creating triple-short with {len(clips)} clip(s)")
     
     day = strategy['day']
     challenge = strategy['challenge']
     
-    # Create segments
+    # If only 1 clip, use it for all segments
+    # If 2+ clips, use worst/best
+    # If 3+ clips, use worst/middle/best
+    
+    if len(clips) == 1:
+        worst = middle = best = clips[0]
+    elif len(clips) == 2:
+        scored = [(c, analyze_clip(c)) for c in clips]
+        scored.sort(key=lambda x: x[1])
+        worst = scored[0][0]
+        middle = best = scored[1][0]
+    else:
+        scored = [(c, analyze_clip(c)) for c in clips]
+        scored.sort(key=lambda x: x[1])
+        worst = scored[0][0]
+        middle = scored[len(scored)//2][0]
+        best = scored[-1][0]
+    
     segments = []
     
-    # 1. TRAINING (15s) - Red, chaotic
-    s1 = create_segment(
-        training_clip, 15,
-        f"🎓 TRAINING - Day {day}",
-        '#FF4444',
-        add_engine=True
-    )
+    # Training segment (15s) - RED
+    s1 = process_clip(worst, 15, f"🎓 TRAINING Day {day}", '#FF4444')
     if s1: segments.append(s1)
     
-    # 2. LEARNING (15s) - Yellow, improving
-    s2 = create_segment(
-        learning_clip, 15,
-        f"📈 LEARNING - Day {day}",
-        '#FFAA00',
-        add_engine=True
-    )
+    # Learning segment (15s) - YELLOW  
+    s2 = process_clip(middle, 15, f"📈 LEARNING Day {day}", '#FFAA00')
     if s2: segments.append(s2)
     
-    # 3. PRO (30s) - Green, mastery
-    s3 = create_segment(
-        pro_clip, 30,
-        f"🏆 PRO LEVEL - Day {day}",
-        '#44FF88',
-        add_engine=True
-    )
+    # Pro segment (30s) - GREEN
+    s3 = process_clip(best, 30, f"🏆 PRO Day {day}", '#44FF88')
     if s3: segments.append(s3)
     
     if not segments:
         return None
     
     # Combine
-    final = concatenate_videoclips(segments, method="compose")
-    final = fadein(final, 0.5)
-    final = fadeout(final, 1.0)
+    final = concatenate_videoclips(segments)
+    final = fadein(final, 0.3)
+    final = fadeout(final, 0.5)
     
     # Export
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
     output_path = os.path.join(OUTPUT_DIR, output_name)
+    
+    print(f"💾 Exporting {output_path} ({final.duration:.1f}s)")
+    
     final.write_videofile(
         output_path,
         fps=30,
         codec='libx264',
         audio_codec='aac',
+        bitrate='3000k',
         preset='medium',
         threads=4,
         logger=None
@@ -217,19 +234,18 @@ def create_triple_short(strategy, clips, output_name):
         s.close()
     final.close()
     
-    print(f"✅ Created: {output_path} ({final.duration}s)")
+    print(f"✅ Created: {output_path}")
     return output_path
 
 def main():
     print("=" * 60)
-    print("🎬 TRIPLE-SHORT CREATOR (15s+15s+30s)")
+    print("🎬 DAILY SHORTS CREATOR")
     print("=" * 60)
     
     # Get strategy
     content = ContentStrategy()
     strategy = content.get_today_strategy()
     
-    # Get challenge
     loader = ChallengeLoader()
     challenge = loader.get_active_challenge()
     challenge_name = challenge['name'] if challenge else "Training"
@@ -241,47 +257,20 @@ def main():
     
     # Get clips
     clips = get_all_clips()
-    if len(clips) < 3:
-        print(f"❌ Only {len(clips)} clips, need 3+")
+    print(f"📹 Found {len(clips)} clip(s)")
+    
+    if not clips:
+        print("❌ No clips to process")
         return
     
-    print(f"📹 {len(clips)} clips available")
-    
-    # Create the triple-short
+    # Create triple short
     today = datetime.now().strftime('%Y%m%d')
-    output = create_triple_short(strategy, clips, f"triple_{today}.mp4")
+    output = create_triple_short(clips, strategy, f"daily_{today}.mp4")
     
     if output:
-        # Also create individual shorts for variety
-        print("\n🎬 Creating individual shorts...")
-        
-        scored = [(c, analyze_clip_performance(c)) for c in clips]
-        scored.sort(key=lambda x: x[1])
-        
-        shorts = []
-        
-        # Training short (worst)
-        s = create_segment(scored[0][0], 15, 
-                          f"Training Day {strategy['day']} 💀", '#FF6666')
-        if s:
-            s.write_videofile(os.path.join(OUTPUT_DIR, f"training_{today}.mp4"),
-                            fps=30, codec='libx264', audio_codec='aac',
-                            preset='fast', logger=None)
-            shorts.append(("09:00", "Training"))
-        
-        # Pro short (best)
-        s = create_segment(scored[-1][0], 30,
-                          f"Pro Level Day {strategy['day']} 🏆", '#66FF88')
-        if s:
-            s.write_videofile(os.path.join(OUTPUT_DIR, f"pro_{today}.mp4"),
-                            fps=30, codec='libx264', audio_codec='aac',
-                            preset='fast', logger=None)
-            shorts.append(("21:00", "Pro"))
-        
-        print(f"\n✅ Created {len(shorts)+1} videos:")
-        print(f"  📁 triple_{today}.mp4 (60s full)")
-        for time, name in shorts:
-            print(f"  📁 {name}_{today}.mp4 ({time})")
+        print(f"\n✅ Success! Video created.")
+    else:
+        print("\n❌ Failed to create video")
     
     content.advance_day()
 
