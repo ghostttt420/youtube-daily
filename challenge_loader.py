@@ -1,5 +1,6 @@
 import json
 import os
+import glob
 
 class ChallengeLoader:
     def __init__(self):
@@ -103,6 +104,11 @@ class ChallengeLoader:
                 theme["map"] = {}
             theme["map"].update(changes["map"])
         
+        # Apply car style if specified
+        if "car_style" in challenge:
+            theme["car_style"] = challenge["car_style"]
+            print(f"🚗 Car style set to: {challenge['car_style']}")
+        
         with open("theme.json", 'w') as f:
             json.dump(theme, f, indent=2)
         
@@ -126,3 +132,61 @@ class ChallengeLoader:
                 challenge['video_posted'] = True
                 break
         self.save()
+    
+    def get_challenge_dir_name(self, challenge):
+        """Get directory-safe name for challenge"""
+        if not challenge:
+            return "training"
+        return challenge['name'].lower().replace(" ", "_")
+    
+    def get_clips_for_challenge(self, challenge_id):
+        """Get all video clips for a specific challenge"""
+        challenge = None
+        
+        # Find challenge in history
+        for hist_challenge in self.data.get('challenge_history', []):
+            if hist_challenge['id'] == challenge_id:
+                challenge = hist_challenge
+                break
+        
+        # Check active challenge
+        if not challenge:
+            active = self.get_active_challenge()
+            if active and active['id'] == challenge_id:
+                challenge = active
+        
+        if not challenge:
+            return []
+        
+        challenge_dir = os.path.join("training_clips", self.get_challenge_dir_name(challenge))
+        
+        if not os.path.exists(challenge_dir):
+            return []
+        
+        clips = sorted(glob.glob(os.path.join(challenge_dir, "gen_*.mp4")))
+        return clips
+    
+    def get_clip_for_generation(self, generation):
+        """Find the clip file for a specific generation"""
+        # First check active challenge
+        active = self.get_active_challenge()
+        if active and active['start_gen'] <= generation <= active.get('target_gen', 999999):
+            challenge_dir = os.path.join("training_clips", self.get_challenge_dir_name(active))
+            clip_path = os.path.join(challenge_dir, f"gen_{generation:05d}.mp4")
+            if os.path.exists(clip_path):
+                return clip_path
+        
+        # Check challenge history
+        for challenge in self.data.get('challenge_history', []):
+            if challenge.get('start_gen') <= generation <= challenge.get('end_gen', 999999):
+                challenge_dir = os.path.join("training_clips", self.get_challenge_dir_name(challenge))
+                clip_path = os.path.join(challenge_dir, f"gen_{generation:05d}.mp4")
+                if os.path.exists(clip_path):
+                    return clip_path
+        
+        # Fallback: search all directories
+        all_clips = glob.glob(os.path.join("training_clips", "**", f"gen_{generation:05d}.mp4"), recursive=True)
+        if all_clips:
+            return all_clips[0]
+        
+        return None
