@@ -121,12 +121,51 @@ class Car:
             return True
         return False
 
-    def update(self, map_mask):
+    def check_car_collision(self, other_cars):
+        """Check collision with other cars - funny bumper car style"""
+        if not self.alive:
+            return
+        
+        collision_distance = 35  # Car radius approx
+        
+        for other in other_cars:
+            if other is self or not other.alive:
+                continue
+            
+            dist = self.position.distance_to(other.position)
+            if dist < collision_distance * 2:  # Cars touching
+                # Calculate bounce
+                collision_normal = (self.position - other.position).normalize()
+                
+                # Bounce velocities (funny bumper car effect)
+                bounce_strength = 0.5
+                self.velocity += collision_normal * bounce_strength * 10
+                other.velocity -= collision_normal * bounce_strength * 10
+                
+                # Push cars apart so they don't stick
+                overlap = (collision_distance * 2 - dist) / 2
+                self.position += collision_normal * overlap
+                other.position -= collision_normal * overlap
+                
+                # Add spin for comedy
+                self.angle += random.choice([-15, 15])
+                other.angle += random.choice([-15, 15])
+                
+                # Visual effect - sparks
+                for _ in range(3):
+                    mid_point = (self.position + other.position) / 2
+                    self.particles.append([mid_point, random.randint(10, 20)])
+    
+    def update(self, map_mask, other_cars=None):
         if not self.alive: return
         self.frames_since_gate += 1
-        if self.frames_since_gate > 120:  # Increased from 90
+        if self.frames_since_gate > 120:
             self.alive = False
             return
+        
+        # Check car collisions (funny bumper cars)
+        if other_cars:
+            self.check_car_collision(other_cars)
 
         self.velocity *= self.friction
         rad = math.radians(self.angle)
@@ -275,6 +314,20 @@ class TrackGenerator:
             pygame.draw.circle(vis_surf, road_color, (int(p[0]), int(p[1])), 210)
 
         pygame.draw.lines(vis_surf, COL_CENTER, True, smooth_points, 4)
+        
+        # Draw VISUAL ROAD BORDERS (kerbs) - makes track edges clear
+        border_color = (255, 255, 255, 100)  # Semi-transparent white
+        border_surf = pygame.Surface((WORLD_SIZE, WORLD_SIZE), pygame.SRCALPHA)
+        
+        # Draw inner and outer borders
+        for p in smooth_points[::5]:  # Every 5th point for performance
+            # Inner border
+            pygame.draw.circle(border_surf, (255, 255, 255, 60), (int(p[0]), int(p[1])), 212, 2)
+            # Outer border  
+            pygame.draw.circle(border_surf, (255, 255, 255, 60), (int(p[0]), int(p[1])), 228, 2)
+        
+        # Blit borders onto visual surface
+        vis_surf.blit(border_surf, (0, 0))
 
         return (int(x_new[0]), int(y_new[0])), phys_surf, vis_surf, checkpoints, math.degrees(math.atan2(y_new[5]-y_new[0], x_new[5]-x_new[0]))
 
