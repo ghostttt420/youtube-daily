@@ -283,21 +283,22 @@ class TrackGenerator:
         np.random.seed(seed)
 
     def generate_track(self):
-        """Generate track with proper asphalt rendering using polygons"""
+        """Generate a professional race track with proper asphalt, curbs, and racing line"""
         phys_surf = pygame.Surface((WORLD_SIZE, WORLD_SIZE))
         vis_surf = pygame.Surface((WORLD_SIZE, WORLD_SIZE))
 
         phys_surf.fill((0,0,0)) 
         vis_surf.fill(COL_BG) 
 
-        # Generate control points for the track
+        # Generate smooth track control points
         points = []
-        num_points = 20
-        for i in range(num_points):
-            angle = (i / num_points) * 2 * math.pi
-            # Varying radius for interesting track shape
-            base_radius = 1400
-            variation = np.random.randint(-300, 300)
+        num_control_points = 12
+        for i in range(num_control_points):
+            angle = (i / num_control_points) * 2 * math.pi
+            # Create flowing track with smooth curves
+            base_radius = 1500
+            # Use smoother variation
+            variation = int(200 * math.sin(i * 1.5) + 150 * math.cos(i * 2.3))
             radius = base_radius + variation
             points.append((
                 WORLD_SIZE // 2 + radius * math.cos(angle),
@@ -305,84 +306,130 @@ class TrackGenerator:
             ))
         points.append(points[0])  # Close the loop
 
-        # Create smooth spline
+        # Create very smooth spline with many points
         pts = np.array(points)
-        tck, u = splprep(pts.T, u=None, s=0.0, per=1)
-        u_new = np.linspace(u.min(), u.max(), 2000)  # More points for smoother curves
+        tck, u = splprep(pts.T, u=None, s=2.0, per=1)  # s=2.0 for smoother curves
+        u_new = np.linspace(u.min(), u.max(), 3000)  # Many points for smoothness
         x_new, y_new = splev(u_new, tck, der=0)
-        smooth_points = list(zip(x_new, y_new))
+        centerline = [(float(x), float(y)) for x, y in zip(x_new, y_new)]
         
-        # Calculate checkpoints
-        checkpoints = smooth_points[::(len(smooth_points)//12)]  # ~12 checkpoints
+        # Calculate checkpoints (~10 evenly spaced)
+        checkpoints = centerline[::(len(centerline)//10)]
 
-        # === PROPER ASPHALT TRACK RENDERING ===
-        # Calculate inner and outer track boundaries
-        track_width = 180  # Total track width
-        inner_points = []
-        outer_points = []
+        # === PROFESSIONAL TRACK RENDERING ===
+        track_half_width = 90  # Half of 180px track width
+        curb_half_width = 12   # Half of 24px curb width
         
-        for i in range(len(smooth_points)):
-            # Get current point and next point for tangent
-            p1 = pygame.math.Vector2(smooth_points[i])
-            p2 = pygame.math.Vector2(smooth_points[(i+1) % len(smooth_points)])
+        # Calculate track boundaries
+        left_edge = []      # Outer edge (left side looking forward)
+        right_edge = []     # Inner edge (right side looking forward)
+        left_curb = []      # Outer curb edge
+        right_curb = []     # Inner curb edge
+        
+        for i in range(len(centerline)):
+            # Current point and next point for direction
+            curr = pygame.math.Vector2(centerline[i])
+            next_idx = (i + 1) % len(centerline)
+            next_p = pygame.math.Vector2(centerline[next_idx])
             
-            # Calculate perpendicular direction
-            tangent = p2 - p1
-            if tangent.length() > 0:
-                tangent = tangent.normalize()
-                normal = pygame.math.Vector2(-tangent.y, tangent.x)
+            # Calculate forward direction
+            forward = next_p - curr
+            if forward.length() > 0:
+                forward = forward.normalize()
+                # Perpendicular (normal) pointing left
+                normal = pygame.math.Vector2(-forward.y, forward.x)
             else:
                 normal = pygame.math.Vector2(0, 1)
             
-            # Inner and outer points
-            inner = p1 - normal * (track_width / 2)
-            outer = p1 + normal * (track_width / 2)
-            inner_points.append((int(inner.x), int(inner.y)))
-            outer_points.append((int(outer.x), int(outer.y)))
+            # Calculate edge points
+            left_pt = curr + normal * track_half_width
+            right_pt = curr - normal * track_half_width
+            left_curb_pt = curr + normal * (track_half_width - curb_half_width)
+            right_curb_pt = curr - normal * (track_half_width - curb_half_width)
+            
+            left_edge.append((int(left_pt.x), int(left_pt.y)))
+            right_edge.append((int(right_pt.x), int(right_pt.y)))
+            left_curb.append((int(left_curb_pt.x), int(left_curb_pt.y)))
+            right_curb.append((int(right_curb_pt.x), int(right_curb_pt.y)))
 
-        # Create physics mask (inner area is drivable)
-        pygame.draw.polygon(phys_surf, (255, 255, 255), inner_points)
+        # 1. Create physics collision mask (drivable area inside right_edge)
+        pygame.draw.polygon(phys_surf, (255, 255, 255), right_edge)
 
-        # Draw visual track
-        # 1. Draw grass/outer area
-        # (already filled with background color)
-        
-        # 2. Draw outer wall/barrier
-        wall_width = 20
-        pygame.draw.polygon(vis_surf, COL_WALL, outer_points)
-        
-        # 3. Draw curb/edge
-        curb_points = []
-        for i in range(len(smooth_points)):
-            p1 = pygame.math.Vector2(smooth_points[i])
-            p2 = pygame.math.Vector2(smooth_points[(i+1) % len(smooth_points)])
-            tangent = p2 - p1
-            if tangent.length() > 0:
-                tangent = tangent.normalize()
-                normal = pygame.math.Vector2(-tangent.y, tangent.x)
+        # 2. Draw outer wall/barrier (beyond left_edge)
+        wall_points = []
+        for i in range(len(centerline)):
+            curr = pygame.math.Vector2(centerline[i])
+            next_idx = (i + 1) % len(centerline)
+            next_p = pygame.math.Vector2(centerline[next_idx])
+            forward = next_p - curr
+            if forward.length() > 0:
+                forward = forward.normalize()
+                normal = pygame.math.Vector2(-forward.y, forward.x)
             else:
                 normal = pygame.math.Vector2(0, 1)
-            curb = p1 + normal * (track_width / 2 - 10)
-            curb_points.append((int(curb.x), int(curb.y)))
+            wall_pt = curr + normal * (track_half_width + 25)
+            wall_points.append((int(wall_pt.x), int(wall_pt.y)))
         
-        # Draw curbs (red and white alternating)
-        curb_segment_length = len(curb_points) // 20
-        for i in range(0, len(curb_points), curb_segment_length):
-            segment = curb_points[i:i+curb_segment_length]
-            color = (220, 20, 60) if (i // curb_segment_length) % 2 == 0 else (255, 255, 255)
-            if len(segment) > 2:
-                pygame.draw.polygon(vis_surf, color, segment)
+        # Draw wall as thick line
+        pygame.draw.polygon(vis_surf, COL_WALL, wall_points)
+
+        # 3. Draw alternating RED/WHITE curbs (between left_edge and left_curb)
+        curb_segments = 24  # Number of curb segments
+        segment_size = len(centerline) // curb_segments
         
-        # 4. Draw asphalt road
-        pygame.draw.polygon(vis_surf, COL_ROAD, inner_points)
+        for seg in range(curb_segments):
+            start_idx = seg * segment_size
+            end_idx = min((seg + 1) * segment_size, len(centerline))
+            
+            # Alternate red and white
+            color = (220, 30, 30) if seg % 2 == 0 else (240, 240, 240)  # Red/White curbs
+            
+            # Create curb polygon for this segment
+            curb_poly = []
+            # Add left_edge points
+            for i in range(start_idx, end_idx):
+                curb_poly.append(left_edge[i])
+            # Add left_curb points in reverse
+            for i in range(end_idx - 1, start_idx - 1, -1):
+                curb_poly.append(left_curb[i])
+            
+            if len(curb_poly) > 2:
+                pygame.draw.polygon(vis_surf, color, curb_poly)
+
+        # 4. Draw ASPHALT road surface (between left_curb and right_curb)
+        road_polygon = left_curb + right_curb[::-1]  # Combine and close
+        pygame.draw.polygon(vis_surf, COL_ROAD, road_polygon)
         
-        # 5. Draw center racing line (dashed)
-        dash_length = len(smooth_points) // 30
-        for i in range(0, len(smooth_points), dash_length * 2):
-            segment = smooth_points[i:i+dash_length]
-            if len(segment) > 1:
-                pts = [(int(p[0]), int(p[1])) for p in segment]
-                pygame.draw.lines(vis_surf, COL_CENTER, False, pts, 4)
+        # 5. Draw dashed RACING LINE in center
+        dash_length = 40  # Pixels per dash
+        gap_length = 30   # Pixels between dashes
+        
+        accumulated_dist = 0
+        drawing_dash = True
+        dash_points = []
+        
+        for i in range(len(centerline) - 1):
+            p1 = pygame.math.Vector2(centerline[i])
+            p2 = pygame.math.Vector2(centerline[i + 1])
+            seg_dist = p1.distance_to(p2)
+            
+            accumulated_dist += seg_dist
+            
+            if drawing_dash:
+                dash_points.append((int(p1.x), int(p1.y)))
+                if accumulated_dist >= dash_length:
+                    # Draw this dash
+                    if len(dash_points) > 1:
+                        pygame.draw.lines(vis_surf, COL_CENTER, False, dash_points, 6)
+                    dash_points = []
+                    accumulated_dist = 0
+                    drawing_dash = False
+            else:
+                # In gap
+                if accumulated_dist >= gap_length:
+                    accumulated_dist = 0
+                    drawing_dash = True
+                    dash_points = [(int(p1.x), int(p1.y))]
 
         return (int(x_new[0]), int(y_new[0])), phys_surf, vis_surf, checkpoints, math.degrees(math.atan2(y_new[5]-y_new[0], x_new[5]-x_new[0]))
 
