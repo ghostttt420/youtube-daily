@@ -235,16 +235,22 @@ def run_simulation(genomes, config):
 
             output = nets[i].activate(inputs)
             
-            # Use neural network output directly for steering (lower threshold = more responsive)
+            # Steering with damping to prevent spinning
             steering_value = output[0]
-            if steering_value > 0.15:  # Lowered from 0.3
+            
+            # Smooth the steering (prevent rapid oscillation)
+            if not hasattr(car, 'smoothed_steering'):
+                car.smoothed_steering = 0
+            car.smoothed_steering = car.smoothed_steering * 0.7 + steering_value * 0.3
+            
+            if car.smoothed_steering > 0.2:
                 car.input_steer(right=True)
-                car.steering = min(steering_value, 1.0)
-            elif steering_value < -0.15:  # Lowered from -0.3
+                car.steering = min(car.smoothed_steering * 0.6, 0.8)  # Cap at 0.8
+            elif car.smoothed_steering < -0.2:
                 car.input_steer(left=True)
-                car.steering = max(steering_value, -1.0)
+                car.steering = max(car.smoothed_steering * 0.6, -0.8)  # Cap at -0.8
             else:
-                car.steering = steering_value * 0.5  # Increased from 0.3
+                car.steering = car.smoothed_steering * 0.3
             
             car.input_gas()
             car.update(map_mask, cars)
