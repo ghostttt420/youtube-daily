@@ -295,10 +295,10 @@ class TrackGenerator:
 
     def generate_track(self):
         """Generate a professional race track with proper asphalt, curbs, and racing line"""
-        phys_surf = pygame.Surface((WORLD_SIZE, WORLD_SIZE))
+        phys_surf = pygame.Surface((WORLD_SIZE, WORLD_SIZE), pygame.SRCALPHA)
         vis_surf = pygame.Surface((WORLD_SIZE, WORLD_SIZE))
 
-        phys_surf.fill((0,0,0)) 
+        phys_surf.fill((0, 0, 0, 0))  # Fully transparent for proper mask 
         vis_surf.fill(COL_BG) 
 
         # Generate smooth track control points
@@ -364,9 +364,24 @@ class TrackGenerator:
             right_curb.append((int(right_curb_pt.x), int(right_curb_pt.y)))
 
         # 1. Create physics collision mask (drivable track area between edges)
-        # Create ring polygon: left_edge forward, then right_edge backward
-        track_polygon = left_edge + right_edge[::-1]
-        pygame.draw.polygon(phys_surf, (255, 255, 255), track_polygon)
+        # Draw track as series of quadrilaterals (road segments)
+        for i in range(len(centerline) - 1):
+            # Create quad for this segment: left->right at i, then right->left at i+1
+            quad = [
+                left_edge[i],
+                right_edge[i],
+                right_edge[i + 1],
+                left_edge[i + 1]
+            ]
+            pygame.draw.polygon(phys_surf, (255, 255, 255), quad)
+        # Close the loop
+        quad = [
+            left_edge[-1],
+            right_edge[-1],
+            right_edge[0],
+            left_edge[0]
+        ]
+        pygame.draw.polygon(phys_surf, (255, 255, 255), quad)
 
         # 2. Draw outer wall/barrier (beyond left_edge) and create wall collision mask
         wall_points = []
