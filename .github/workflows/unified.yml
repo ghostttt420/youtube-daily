@@ -58,12 +58,18 @@ jobs:
         pip install -r requirements.txt
     
     # ========== RESTORE STATE ==========
-    - name: Download previous checkpoint
-      continue-on-error: true
+    # NOTE: Using repo checkpoints only (up to 530) - avoiding bad checkpoints from release
+    # - name: Download previous checkpoint
+    #   continue-on-error: true
+    #   run: |
+    #     gh release download latest --pattern "neat-checkpoint-*" || echo "No checkpoint found"
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: List available checkpoints
       run: |
-        gh release download latest --pattern "neat-checkpoint-*" || echo "No checkpoint found"
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        echo "📁 Available checkpoints in repo:"
+        ls -la neat-checkpoint-* 2>/dev/null | tail -5 || echo "No checkpoints found"
     
     - name: Restore content state
       continue-on-error: true
