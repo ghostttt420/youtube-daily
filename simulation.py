@@ -381,13 +381,20 @@ class TrackGenerator:
             wall_pt = curr + normal * (track_half_width + 25)
             wall_points.append((int(wall_pt.x), int(wall_pt.y)))
         
-        # Draw wall as thick line
-        pygame.draw.polygon(vis_surf, COL_WALL, wall_points)
+        # Draw wall as thick line segments (not closed polygon)
+        for i in range(len(wall_points)):
+            p1 = wall_points[i]
+            p2 = wall_points[(i + 1) % len(wall_points)]
+            pygame.draw.line(vis_surf, COL_WALL, p1, p2, width=20)
         
         # Create wall collision mask (for car collision detection)
-        wall_surf = pygame.Surface((WORLD_SIZE, WORLD_SIZE))
-        wall_surf.fill((0, 0, 0))
-        pygame.draw.polygon(wall_surf, (255, 255, 255), wall_points)
+        # Use SRCALPHA so (0,0,0,0) pixels don't count in the mask
+        wall_surf = pygame.Surface((WORLD_SIZE, WORLD_SIZE), pygame.SRCALPHA)
+        wall_surf.fill((0, 0, 0, 0))  # Fully transparent
+        for i in range(len(wall_points)):
+            p1 = wall_points[i]
+            p2 = wall_points[(i + 1) % len(wall_points)]
+            pygame.draw.line(wall_surf, (255, 255, 255, 255), p1, p2, width=20)
         wall_mask = pygame.mask.from_surface(wall_surf)
 
         # 3. Draw alternating RED/WHITE curbs (between left_edge and left_curb)
