@@ -101,9 +101,7 @@ class Car:
     def update(self, map_mask, other_cars=None, wall_mask=None):
         if not self.alive: return
         self.frames_since_gate += 1
-        if self.frames_since_gate > 180:  # 6 seconds (was 3s)
-            self.alive = False
-            return
+        # Cars no longer die from stagnation (can drive forever)
         
         # Check car collisions (gentle bumper cars)
         if other_cars:
