@@ -251,30 +251,37 @@ def run_simulation(genomes, config):
             car.check_radar(map_mask)
             
             if car.check_gates(checkpoints):
-                ge[i].fitness += 500
-                # Pro bonus: speed at gate (pros maintain speed)
+                ge[i].fitness += 1000  # Major reward for passing gates
+                # Pro bonus: maintain speed through gates (pros don't slow down)
                 speed_ratio = car.velocity.length() / car.max_speed
-                ge[i].fitness += speed_ratio * 100
+                ge[i].fitness += speed_ratio * 200  # Up to 200 bonus for full speed
             
             if car.gates_passed >= len(checkpoints):
-                ge[i].fitness += 2000 
+                ge[i].fitness += 5000  # Big lap completion bonus
             
-            dist_score = 1.0 - gps[1] 
-            ge[i].fitness += dist_score * 0.05
+            # Distance to next gate (closer = better)
+            dist_score = max(0, 1.0 - gps[1])
+            ge[i].fitness += dist_score * 2.0
             
-            # Pro: Smooth steering bonus (less jitter = more pro)
+            # Pro: Smooth steering (pros drive smoothly, not jerky)
             if not hasattr(car, 'prev_steering'):
                 car.prev_steering = 0
             steering_change = abs(car.steering - car.prev_steering)
-            if steering_change < 0.2:  # Smooth steering
-                ge[i].fitness += 1.0  # Bonus for smoothness
+            if steering_change < 0.15:  # Very smooth
+                ge[i].fitness += 2.0
+            elif steering_change < 0.3:  # Moderately smooth
+                ge[i].fitness += 0.5
             car.prev_steering = car.steering
             
-            # Pro: Survival bonus (staying alive longer = better)
-            ge[i].fitness += 0.5
+            # Pro: Speed reward (pros go fast)
+            speed_ratio = car.velocity.length() / car.max_speed
+            ge[i].fitness += speed_ratio * 3.0  # Reward for being fast
+            
+            # Survival bonus
+            ge[i].fitness += 1.0
 
             if not car.alive:
-                 ge[i].fitness -= 200
+                 ge[i].fitness -= 500  # Harsh penalty for dying
 
         for i in range(len(cars) - 1, -1, -1):
             if not cars[i].alive:
