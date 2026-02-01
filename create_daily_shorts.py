@@ -31,7 +31,7 @@ MUSIC_FILES = ["music.mp3", "music2.mp3", "music3.mp3"]
 
 
 def get_all_clips():
-    """Get all mp4 clips from training_clips directory"""
+    """Get all mp4 clips from training_clips directory, grouped by theme folder"""
     pattern = os.path.join(VIDEO_DIR, "**", "*.mp4")
     clips = glob.glob(pattern, recursive=True)
     
@@ -44,7 +44,23 @@ def get_all_clips():
         except (IndexError, ValueError):
             return 0
     
-    return sorted(clips, key=get_gen)
+    # Group clips by their parent directory (theme folder)
+    from collections import defaultdict
+    clips_by_folder = defaultdict(list)
+    for clip in clips:
+        folder = os.path.dirname(clip)
+        clips_by_folder[folder].append(clip)
+    
+    # Sort each folder's clips by generation
+    for folder in clips_by_folder:
+        clips_by_folder[folder].sort(key=get_gen)
+    
+    # Return a random folder's clips (all same theme)
+    if clips_by_folder:
+        selected_folder = random.choice(list(clips_by_folder.keys()))
+        logger.info(f"Selected theme folder: {os.path.basename(selected_folder)}")
+        return clips_by_folder[selected_folder]
+    return []
 
 
 def get_clip_duration(video_path):
