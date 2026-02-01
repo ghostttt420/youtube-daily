@@ -139,24 +139,40 @@ def run_dummy_generation():
 
     running = True
     frame_count = 0
-    while running and len(cars) > 0:
+    while running and frame_count <= 900:  # 30 seconds regardless of cars dying
         frame_count += 1
-        if frame_count > 300: break 
         for event in pygame.event.get():
             if event.type == pygame.QUIT: sys.exit()
+        
+        # Update camera with leader if any cars alive
         alive_cars = [c for c in cars if c.alive]
-        if not alive_cars: break
-        leader = max(alive_cars, key=lambda c: c.distance_traveled)
-        camera.update(leader)
-        for c in cars: c.is_leader = (c == leader)
+        if alive_cars:
+            leader = max(alive_cars, key=lambda c: c.distance_traveled)
+            camera.update(leader)
+            for c in cars: 
+                c.is_leader = (c == leader)
+        
         for car in cars:
             if not car.alive: continue
-            if random.random() < 0.1: car.steering = random.choice([-1, 0, 1])
+            # Gen 0: Smart steering toward next checkpoint (keeps cars visible)
+            gps = car.get_data(checkpoints)
+            heading_error = gps[0]  # -1 to 1, negative = turn left, positive = turn right
+            
+            # Very aggressive steering to ensure cars stay on track for full 30s
+            if heading_error < -0.02:
+                car.steering = -1.0  # Full left
+            elif heading_error > 0.02:
+                car.steering = 1.0   # Full right
+            else:
+                car.steering = 0     # Go straight
+            
             car.input_gas()
-            car.update(map_mask, cars, wall_mask)  # Pass cars and wall_mask for collision detection
+            car.update(map_mask, cars, wall_mask)
+        
         screen.fill(simulation.COL_BG)
         screen.blit(visual_map, (camera.camera.x, camera.camera.y))
-        for car in cars: car.draw(screen, camera)
+        for car in cars: 
+            car.draw(screen, camera)
 
         simulation.draw_text_with_outline(screen, "GEN 0: NOOBS", (20, 20), size=100, color=(255, 50, 50))
 
