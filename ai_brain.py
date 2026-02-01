@@ -253,15 +253,9 @@ def run_simulation(genomes, config):
                 checkpoint_steering = -heading_error
                 car.steering = checkpoint_steering * 0.5 + neat_steering * 0.5
             else:
-                # Pro (Gen 50+): pure trained NEAT behavior
-                if neat_steering > 0.5:
-                    car.input_steer(right=True)
-                    car.steering = min(neat_steering, 1.0)
-                elif neat_steering < -0.5:
-                    car.input_steer(left=True)
-                    car.steering = max(neat_steering, -1.0)
-                else:
-                    car.steering = neat_steering
+                # Pro (Gen 50+): pure trained NEAT - use output directly
+                # The NEAT from checkpoint 530 was trained to output steering directly
+                car.steering = neat_steering
             
             car.input_gas()
             car.update(map_mask, cars)
