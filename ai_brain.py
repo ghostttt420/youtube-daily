@@ -404,9 +404,12 @@ def run_simulation(genomes, config):
             heading_bonus = max(0, 1.0 - abs(gps[0]))  # gps[0] is heading error
             ge[i].fitness += heading_bonus * 0.3
             
-            # Death penalty - SEVERE to teach cars to stay alive
-            if not car.alive:
-                ge[i].fitness -= 1000  # Heavy penalty for dying (was -150)
+            # Death penalty - apply only once when car dies (tracked by prev_alive)
+            if not hasattr(car, 'death_penalty_applied'):
+                car.death_penalty_applied = False
+            if not car.alive and not car.death_penalty_applied:
+                ge[i].fitness -= 500  # One-time penalty for dying
+                car.death_penalty_applied = True
             
             # Stagnation penalty (not progressing) - more lenient for pro driving
             if car.frames_since_gate > 180:  # 6 seconds instead of 3.3 (was 100)
