@@ -235,16 +235,16 @@ def run_simulation(genomes, config):
 
             output = nets[i].activate(inputs)
             
-            # Pro steering: more gradual
+            # Use neural network output directly for steering (lower threshold = more responsive)
             steering_value = output[0]
-            if steering_value > 0.3:
+            if steering_value > 0.15:  # Lowered from 0.3
                 car.input_steer(right=True)
                 car.steering = min(steering_value, 1.0)
-            elif steering_value < -0.3:
+            elif steering_value < -0.15:  # Lowered from -0.3
                 car.input_steer(left=True)
                 car.steering = max(steering_value, -1.0)
             else:
-                car.steering = steering_value * 0.3
+                car.steering = steering_value * 0.5  # Increased from 0.3
             
             car.input_gas()
             car.update(map_mask, cars)
