@@ -319,8 +319,8 @@ class TrackGenerator:
         checkpoints = centerline[::(len(centerline)//10)]
 
         # === PROFESSIONAL TRACK RENDERING ===
-        track_half_width = 120  # Half of 240px track width (wider track)
-        curb_half_width = 15    # Half of 30px curb width
+        track_half_width = 180  # Half of 360px track width (1.5x wider)
+        curb_half_width = 20    # Half of 40px curb width
         
         # Calculate track boundaries
         left_edge = []      # Outer edge (left side looking forward)
