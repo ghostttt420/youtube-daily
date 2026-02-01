@@ -178,7 +178,9 @@ class Car:
             self.velocity.scale_to_length(self.max_speed)
 
         if self.velocity.length() > 2:
-            self.angle += self.steering * self.velocity.length() * self.turn_speed
+            # Pro steering: less sensitive at high speed to prevent oversteer
+            speed_factor = min(self.velocity.length(), 20)  # Cap steering effect at 20 speed
+            self.angle += self.steering * speed_factor * self.turn_speed * 0.6  # Reduced by 40%
 
             if abs(self.steering) > 0.5 and self.velocity.length() > 15:
                 if random.random() < 0.3:
@@ -317,8 +319,8 @@ class TrackGenerator:
         checkpoints = centerline[::(len(centerline)//10)]
 
         # === PROFESSIONAL TRACK RENDERING ===
-        track_half_width = 90  # Half of 180px track width
-        curb_half_width = 12   # Half of 24px curb width
+        track_half_width = 120  # Half of 240px track width (wider track)
+        curb_half_width = 15    # Half of 30px curb width
         
         # Calculate track boundaries
         left_edge = []      # Outer edge (left side looking forward)
