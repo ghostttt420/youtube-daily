@@ -140,19 +140,19 @@ class Car:
                 diff = self.position - other.position
                 collision_normal = diff.normalize() if diff.length() > 0 else pygame.math.Vector2(1, 0)
                 
-                # Bounce velocities (funny bumper car effect)
-                bounce_strength = 0.5
-                self.velocity += collision_normal * bounce_strength * 10
-                other.velocity -= collision_normal * bounce_strength * 10
+                # Gentle bounce (reduced chaos for competitive racing)
+                bounce_strength = 0.2  # Reduced from 0.5
+                self.velocity += collision_normal * bounce_strength * 5  # Reduced from 10
+                other.velocity -= collision_normal * bounce_strength * 5
                 
                 # Push cars apart so they don't stick
                 overlap = (collision_distance * 2 - dist) / 2
                 self.position += collision_normal * overlap
                 other.position -= collision_normal * overlap
                 
-                # Add spin for comedy
-                self.angle += random.choice([-15, 15])
-                other.angle += random.choice([-15, 15])
+                # Minimal spin (pro drivers don't spin out easily)
+                self.angle += random.choice([-5, 5])  # Reduced from 15
+                other.angle += random.choice([-5, 5])
                 
                 # Visual effect - sparks
                 for _ in range(3):
@@ -162,7 +162,7 @@ class Car:
     def update(self, map_mask, other_cars=None, wall_mask=None):
         if not self.alive: return
         self.frames_since_gate += 1
-        if self.frames_since_gate > 120:
+        if self.frames_since_gate > 180:  # 6 seconds at 30fps (was 4s/120 frames)
             self.alive = False
             return
         
@@ -509,6 +509,9 @@ def draw_hud(screen, car, generation, frame_count, checkpoints, challenge_name=N
     )
     
     # Speed (top right, smaller) - color coded
+    if car is None:
+        return  # No car to display speed/gates for
+    
     speed_kmh = int(car.velocity.length() * 3.6)
     if speed_kmh > 80:
         speed_color = (0, 255, 100)  # Green - fast
