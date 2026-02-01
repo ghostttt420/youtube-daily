@@ -113,7 +113,7 @@ def load_audio_files(duration):
     return None
 
 
-def create_segment(clip_path, target_duration, caption, color_hex, day_num):
+def create_segment(clip_path, target_duration, caption, color_hex, day_num, allow_loop=True):
     """
     Create a video segment with text overlay and audio.
     
@@ -123,6 +123,7 @@ def create_segment(clip_path, target_duration, caption, color_hex, day_num):
         caption: Text to display
         color_hex: Color for the caption text
         day_num: Day number for display
+        allow_loop: If False, won't loop video (for continuous pro footage)
     
     Returns:
         Processed VideoFileClip or None on error
@@ -143,16 +144,26 @@ def create_segment(clip_path, target_duration, caption, color_hex, day_num):
             clip = clip.subclip(0, target_duration)
             logger.info(f"  Trimmed from {clip.duration:.1f}s to {target_duration}s")
         elif clip.duration < target_duration:
-            # Loop to fill duration
-            loops_needed = int(target_duration / clip.duration) + 1
-            logger.info(f"  Looping {loops_needed}x to reach {target_duration}s")
-            from moviepy.editor import concatenate_videoclips
-            clip = concatenate_videoclips([clip] * loops_needed)
-            clip = clip.subclip(0, target_duration)
+            if allow_loop:
+                # Loop to fill duration
+                loops_needed = int(target_duration / clip.duration) + 1
+                logger.info(f"  Looping {loops_needed}x to reach {target_duration}s")
+                from moviepy.editor import concatenate_videoclips
+                clip = concatenate_videoclips([clip] * loops_needed)
+                clip = clip.subclip(0, target_duration)
+            else:
+                # For pro segment: use full clip, slow down slightly if needed
+                logger.info(f"  Using full clip {clip.duration:.1f}s (no loop)")
+                if clip.duration < target_duration:
+                    # Slow down to extend duration
+                    speed_factor = clip.duration / target_duration
+                    clip = clip.fx(lambda c: c.speedx(speed_factor))
+                    logger.info(f"  Slowed down to {speed_factor:.2f}x speed")
         
-        # Add caption text
+        # Add caption text (appears briefly at start then disappears)
         try:
-            # Main caption at top
+            # Main caption at top - only show for first 2 seconds
+            text_duration = min(2.0, clip.duration)
             txt_clip = TextClip(
                 caption,
                 fontsize=50,
@@ -162,21 +173,11 @@ def create_segment(clip_path, target_duration, caption, color_hex, day_num):
                 stroke_width=2,
                 method='caption',
                 size=(clip.w - 40, None)
-            ).set_duration(clip.duration).set_position(('center', 20))
-            
-            # Day info at bottom
-            day_clip = TextClip(
-                f"Day {day_num}",
-                fontsize=35,
-                color='#CCCCCC',
-                font='DejaVu-Sans',
-                stroke_color='black',
-                stroke_width=1
-            ).set_duration(clip.duration).set_position(('center', clip.h - 70))
+            ).set_duration(text_duration).set_position(('center', 20))
             
             # Composite text over video
-            clip = CompositeVideoClip([clip, txt_clip, day_clip])
-            logger.info(f"  Added text overlays")
+            clip = CompositeVideoClip([clip, txt_clip])
+            logger.info(f"  Added text overlay (2s)")
         except Exception as e:
             logger.warning(f"  Could not add text: {e}")
         
@@ -244,9 +245,9 @@ def create_triple_short(clips, strategy, output_name):
     if seg2:
         segments.append(seg2)
     
-    # Segment 3: Pro (30s) - Green
+    # Segment 3: Pro (30s) - Green - continuous, no looping
     logger.info("Creating PRO segment (30s)...")
-    seg3 = create_segment(best, 30, "PRO LEVEL 🏆", "#44FF88", day)
+    seg3 = create_segment(best, 30, "PRO LEVEL 🏆", "#44FF88", day, allow_loop=False)
     if seg3:
         segments.append(seg3)
     
