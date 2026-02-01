@@ -228,27 +228,44 @@ def run_simulation(genomes, config):
         for i, car in enumerate(cars):
             if not car.alive: continue
             
-            if len(car.radars) < 5: inputs = [0] * 5
-            else: inputs = [d[1] / simulation.SENSOR_LENGTH for d in car.radars]
             gps = car.get_data(checkpoints)
-            inputs.extend(gps)
-
+            heading_error = gps[0]  # -1 to 1, negative = checkpoint left, positive = right
+            
+            if len(car.radars) < 5: 
+                radar_inputs = [0] * 5
+            else: 
+                radar_inputs = [d[1] / simulation.SENSOR_LENGTH for d in car.radars]
+            
+            # Build inputs for NEAT
+            inputs = radar_inputs + gps
             output = nets[i].activate(inputs)
             
-            # Steering with damping to prevent spinning
-            steering_value = output[0]
+            # Blend NEAT output with hardcoded checkpoint steering
+            neat_steering = output[0]
+            checkpoint_steering = -heading_error  # Steer toward checkpoint
             
-            # Smooth the steering (prevent rapid oscillation)
+            # Blend: more hardcoded early on, more NEAT later
+            if GENERATION <= 10:
+                blend = 0.9  # Training: 90% checkpoint following
+            elif GENERATION <= 30:
+                blend = 0.7  # Improving: 70% checkpoint following  
+            else:
+                blend = 0.3  # Pro: 30% checkpoint, 70% NEAT learned behavior
+            
+            final_steering = checkpoint_steering * blend + neat_steering * (1 - blend)
+            
+            # Smooth the steering
             if not hasattr(car, 'smoothed_steering'):
                 car.smoothed_steering = 0
-            car.smoothed_steering = car.smoothed_steering * 0.7 + steering_value * 0.3
+            car.smoothed_steering = car.smoothed_steering * 0.7 + final_steering * 0.3
             
+            # Apply steering
             if car.smoothed_steering > 0.2:
                 car.input_steer(right=True)
-                car.steering = min(car.smoothed_steering * 0.6, 0.8)  # Cap at 0.8
+                car.steering = min(car.smoothed_steering * 0.6, 0.8)
             elif car.smoothed_steering < -0.2:
                 car.input_steer(left=True)
-                car.steering = max(car.smoothed_steering * 0.6, -0.8)  # Cap at -0.8
+                car.steering = max(car.smoothed_steering * 0.6, -0.8)
             else:
                 car.steering = car.smoothed_steering * 0.3
             
