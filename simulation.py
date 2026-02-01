@@ -39,7 +39,7 @@ class Car:
         self.max_speed = 29      
         self.friction = THEME["physics"]["friction"] 
         self.acceleration_rate = 1.2
-        self.turn_speed = 0.18   
+        self.turn_speed = 0.12  # Reduced from 0.18 to prevent spinning   
         self.alive = True
         self.distance_traveled = 0 
         self.is_leader = False
