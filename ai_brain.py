@@ -252,11 +252,26 @@ def run_simulation(genomes, config):
             
             if car.check_gates(checkpoints):
                 ge[i].fitness += 500
+                # Pro bonus: speed at gate (pros maintain speed)
+                speed_ratio = car.velocity.length() / car.max_speed
+                ge[i].fitness += speed_ratio * 100
+            
             if car.gates_passed >= len(checkpoints):
                 ge[i].fitness += 2000 
             
             dist_score = 1.0 - gps[1] 
             ge[i].fitness += dist_score * 0.05
+            
+            # Pro: Smooth steering bonus (less jitter = more pro)
+            if not hasattr(car, 'prev_steering'):
+                car.prev_steering = 0
+            steering_change = abs(car.steering - car.prev_steering)
+            if steering_change < 0.2:  # Smooth steering
+                ge[i].fitness += 1.0  # Bonus for smoothness
+            car.prev_steering = car.steering
+            
+            # Pro: Survival bonus (staying alive longer = better)
+            ge[i].fitness += 0.5
 
             if not car.alive:
                  ge[i].fitness -= 200
