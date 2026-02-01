@@ -14,7 +14,7 @@ try:
 except:
     THEME = {
         "map_seed": 42, 
-        "physics": {"friction": 0.97, "max_speed": 35, "turn_speed": 0.22, "acceleration_rate": 1.4},
+        "physics": {"friction": 0.97, "max_speed": 20, "turn_speed": 0.22, "acceleration_rate": 0.8},  # Slower for better control
         "visuals": {
             "bg": [8, 10, 15], 
             "wall": [255, 40, 100], 
@@ -199,14 +199,6 @@ class Car:
             if map_mask.get_at((int(self.position.x), int(self.position.y))) == 0:
                 self.alive = False
         except: self.alive = False
-        
-        # Check wall collision (if wall_mask provided)
-        if wall_mask is not None:
-            try:
-                if wall_mask.get_at((int(self.position.x), int(self.position.y))) == 1:
-                    # Hit the wall - bounce or crash
-                    self.alive = False  # Crash into wall
-            except: pass
 
     def check_radar(self, map_mask):
         self.radars.clear()
@@ -364,24 +356,11 @@ class TrackGenerator:
             right_curb.append((int(right_curb_pt.x), int(right_curb_pt.y)))
 
         # 1. Create physics collision mask (drivable track area between edges)
-        # Draw track as series of quadrilaterals (road segments)
-        for i in range(len(centerline) - 1):
-            # Create quad for this segment: left->right at i, then right->left at i+1
-            quad = [
-                left_edge[i],
-                right_edge[i],
-                right_edge[i + 1],
-                left_edge[i + 1]
-            ]
-            pygame.draw.polygon(phys_surf, (255, 255, 255), quad)
-        # Close the loop
-        quad = [
-            left_edge[-1],
-            right_edge[-1],
-            right_edge[0],
-            left_edge[0]
-        ]
-        pygame.draw.polygon(phys_surf, (255, 255, 255), quad)
+        # Draw circles at each centerline point to ensure no gaps
+        # Create physics collision mask (drivable track area between edges)
+        track_radius = 250  # Wider track for better survival (500px total)
+        for x, y in centerline:
+            pygame.draw.circle(phys_surf, (255, 255, 255), (int(x), int(y)), track_radius)
 
         # 2. Draw outer wall/barrier (beyond left_edge) and create wall collision mask
         wall_points = []
@@ -472,7 +451,10 @@ class TrackGenerator:
                     drawing_dash = True
                     dash_points = [(int(p1.x), int(p1.y))]
 
-        return (int(x_new[0]), int(y_new[0])), phys_surf, vis_surf, checkpoints, math.degrees(math.atan2(y_new[5]-y_new[0], x_new[5]-x_new[0])), wall_mask
+        # Calculate start angle along track tangent (follows the curve)
+        start_angle = math.degrees(math.atan2(y_new[5]-y_new[0], x_new[5]-x_new[0]))
+        
+        return (int(x_new[0]), int(y_new[0])), phys_surf, vis_surf, checkpoints, start_angle, wall_mask
 
 
 def draw_text_with_outline(screen, text, pos, size=100, color=(255,255,255), outline_color=(0,0,0), outline_width=3):
