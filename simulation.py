@@ -451,10 +451,12 @@ class TrackGenerator:
                     drawing_dash = True
                     dash_points = [(int(p1.x), int(p1.y))]
 
-        # Calculate start angle along track tangent (follows the curve)
-        start_angle = math.degrees(math.atan2(y_new[5]-y_new[0], x_new[5]-x_new[0]))
+        # Calculate start angle pointing toward first checkpoint (not tangent)
+        start_x, start_y = int(x_new[0]), int(y_new[0])
+        cp1_x, cp1_y = checkpoints[1] if len(checkpoints) > 1 else checkpoints[0]
+        start_angle = math.degrees(math.atan2(cp1_y - start_y, cp1_x - start_x))
         
-        return (int(x_new[0]), int(y_new[0])), phys_surf, vis_surf, checkpoints, start_angle, wall_mask
+        return (start_x, start_y), phys_surf, vis_surf, checkpoints, start_angle, wall_mask
 
 
 def draw_text_with_outline(screen, text, pos, size=100, color=(255,255,255), outline_color=(0,0,0), outline_width=3):
