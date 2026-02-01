@@ -128,7 +128,7 @@ def run_dummy_generation():
     screen = pygame.display.set_mode((simulation.WIDTH, simulation.HEIGHT))
 
     map_gen = simulation.TrackGenerator(seed=THEME["map_seed"])
-    start_pos, track_surface, visual_map, checkpoints_map, start_angle = map_gen.generate_track()
+    start_pos, track_surface, visual_map, checkpoints_map, start_angle, wall_mask = map_gen.generate_track()
     map_mask = pygame.mask.from_surface(track_surface)
     camera = simulation.Camera(simulation.WORLD_SIZE, simulation.WORLD_SIZE)
 
@@ -153,7 +153,7 @@ def run_dummy_generation():
             if not car.alive: continue
             if random.random() < 0.1: car.steering = random.choice([-1, 0, 1])
             car.input_gas()
-            car.update(map_mask, cars)  # Pass cars for collision detection
+            car.update(map_mask, cars, wall_mask)  # Pass cars and wall_mask for collision detection
         screen.fill(simulation.COL_BG)
         screen.blit(visual_map, (camera.camera.x, camera.camera.y))
         for car in cars: car.draw(screen, camera)
@@ -247,7 +247,7 @@ def run_simulation(genomes, config):
     screen = pygame.display.set_mode((simulation.WIDTH, simulation.HEIGHT))
 
     map_gen = simulation.TrackGenerator()
-    start_pos, track_surface, visual_map, checkpoints, start_angle = map_gen.generate_track()
+    start_pos, track_surface, visual_map, checkpoints, start_angle, wall_mask = map_gen.generate_track()
     map_mask = pygame.mask.from_surface(track_surface)
     camera = simulation.Camera(simulation.WORLD_SIZE, simulation.WORLD_SIZE)
 
@@ -357,7 +357,7 @@ def run_simulation(genomes, config):
                 car.steering = steering_value * 0.3  # Gentle correction
 
             car.input_gas()
-            car.update(map_mask, cars)  # Pass cars for collision detection
+            car.update(map_mask, cars, wall_mask)  # Pass cars and wall_mask for collision detection
             car.check_radar(map_mask)
 
             # === PRO FITNESS FUNCTION ===
