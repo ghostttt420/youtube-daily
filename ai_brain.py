@@ -342,10 +342,19 @@ def run_simulation(genomes, config):
             inputs.extend(gps)
 
             output = nets[i].activate(inputs)
-            if output[0] > 0.5: 
+            
+            # Gradual steering for smoother control (pro driving)
+            steering_value = output[0]
+            if steering_value > 0.3:  # Lower threshold for smoother control
                 car.input_steer(right=True)
-            elif output[0] < -0.5: 
+                # Scale steering by output magnitude for finer control
+                car.steering = min(steering_value, 1.0)
+            elif steering_value < -0.3:
                 car.input_steer(left=True)
+                car.steering = max(steering_value, -1.0)
+            else:
+                # Small steering values = near straight (pro keeps line)
+                car.steering = steering_value * 0.3  # Gentle correction
 
             car.input_gas()
             car.update(map_mask, cars)  # Pass cars for collision detection
