@@ -224,27 +224,43 @@ def create_triple_short(clips, strategy, output_name):
     
     day = strategy.get('day', 1)
     
-    # Select clips from consecutive generations (same theme)
-    # Shuffle to pick a random contiguous block of 3 clips
-    if len(clips) == 1:
-        worst = middle = best = clips[0]
+    # Sort clips by generation number to pick from different phases
+    def get_gen_num(clip_path):
+        try:
+            basename = os.path.basename(clip_path)
+            # Extract number from gen_00531.mp4
+            num_part = basename.split('_')[1].split('.')[0]
+            return int(num_part)
+        except:
+            return 0
+    
+    clips_sorted = sorted(clips, key=get_gen_num)
+    
+    if len(clips_sorted) == 1:
+        worst = middle = best = clips_sorted[0]
         logger.info("Using single clip for all segments")
-    elif len(clips) == 2:
-        worst = clips[0]
-        middle = best = clips[1]
+    elif len(clips_sorted) == 2:
+        worst = clips_sorted[0]
+        middle = best = clips_sorted[1]
         logger.info("Using 2 clips: worst and best")
     else:
-        # Pick 3 consecutive clips (same theme) randomly from available clips
-        # This ensures all segments use the same visual theme
-        max_start = len(clips) - 3
-        start_idx = random.randint(0, max(0, max_start))
+        # Pick from different generation ranges for evolution effect
+        # Training: first 1/3 (early gens - struggling)
+        # Learning: middle 1/3 (improving)
+        # Pro: last 1/3 (late gens - professional)
         
-        # Use consecutive clips: first=worst, second=learning, third=best
-        worst = clips[start_idx]
-        middle = clips[start_idx + 1]
-        best = clips[start_idx + 2]
+        third = len(clips_sorted) // 3
         
-        logger.info(f"Selected consecutive clips [{start_idx}:{start_idx+3}] for consistent theme")
+        # Training = early generation (worst performance)
+        worst = clips_sorted[random.randint(0, max(0, third - 1))]
+        
+        # Learning = middle generation (improving)
+        middle = clips_sorted[random.randint(third, min(len(clips_sorted) - 1, third * 2 - 1))]
+        
+        # Pro = late generation (best performance)
+        best = clips_sorted[random.randint(third * 2, len(clips_sorted) - 1)]
+        
+        logger.info(f"Selected clips by generation: Training={get_gen_num(worst)}, Learning={get_gen_num(middle)}, Pro={get_gen_num(best)}")
     
     segments = []
     
