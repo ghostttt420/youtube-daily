@@ -133,11 +133,7 @@ class Car:
         self.acceleration = 0
         self.steering = 0
         
-        # Check track boundary collision
-        try:
-            if map_mask.get_at((int(self.position.x), int(self.position.y))) == 0:
-                self.alive = False
-        except: self.alive = False
+        # Cars no longer die when going off track (can drive anywhere)
 
     def check_car_collision(self, other_cars):
         """Gentle bumper car collision"""
