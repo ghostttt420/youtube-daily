@@ -244,13 +244,13 @@ def run_simulation(genomes, config):
             neat_steering = output[0]
             checkpoint_steering = -heading_error  # Steer toward checkpoint
             
-            # Blend: more hardcoded early on, more NEAT later
+            # Blend based on generation (trained generations use pure NEAT)
             if GENERATION <= 10:
                 blend = 0.9  # Training: 90% checkpoint following
-            elif GENERATION <= 30:
-                blend = 0.7  # Improving: 70% checkpoint following  
+            elif GENERATION <= 50:
+                blend = 0.5  # Improving: 50% checkpoint following  
             else:
-                blend = 0.3  # Pro: 30% checkpoint, 70% NEAT learned behavior
+                blend = 0.0  # Pro (Gen 50+): 100% NEAT learned behavior
             
             final_steering = checkpoint_steering * blend + neat_steering * (1 - blend)
             
