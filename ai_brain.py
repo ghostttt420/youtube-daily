@@ -240,34 +240,28 @@ def run_simulation(genomes, config):
             inputs = radar_inputs + gps
             output = nets[i].activate(inputs)
             
-            # Blend NEAT output with hardcoded checkpoint steering
+            # For trained generations (50+), use pure NEAT output
+            # For early gens, blend with checkpoint steering
             neat_steering = output[0]
-            checkpoint_steering = -heading_error  # Steer toward checkpoint
             
-            # Blend based on generation (trained generations use pure NEAT)
             if GENERATION <= 10:
-                blend = 0.9  # Training: 90% checkpoint following
+                # Training: mostly follow checkpoint
+                checkpoint_steering = -heading_error
+                car.steering = checkpoint_steering * 0.8 + neat_steering * 0.2
             elif GENERATION <= 50:
-                blend = 0.5  # Improving: 50% checkpoint following  
+                # Improving: blend both
+                checkpoint_steering = -heading_error
+                car.steering = checkpoint_steering * 0.5 + neat_steering * 0.5
             else:
-                blend = 0.0  # Pro (Gen 50+): 100% NEAT learned behavior
-            
-            final_steering = checkpoint_steering * blend + neat_steering * (1 - blend)
-            
-            # Smooth the steering
-            if not hasattr(car, 'smoothed_steering'):
-                car.smoothed_steering = 0
-            car.smoothed_steering = car.smoothed_steering * 0.7 + final_steering * 0.3
-            
-            # Apply steering
-            if car.smoothed_steering > 0.2:
-                car.input_steer(right=True)
-                car.steering = min(car.smoothed_steering * 0.6, 0.8)
-            elif car.smoothed_steering < -0.2:
-                car.input_steer(left=True)
-                car.steering = max(car.smoothed_steering * 0.6, -0.8)
-            else:
-                car.steering = car.smoothed_steering * 0.3
+                # Pro (Gen 50+): pure trained NEAT behavior
+                if neat_steering > 0.5:
+                    car.input_steer(right=True)
+                    car.steering = min(neat_steering, 1.0)
+                elif neat_steering < -0.5:
+                    car.input_steer(left=True)
+                    car.steering = max(neat_steering, -1.0)
+                else:
+                    car.steering = neat_steering
             
             car.input_gas()
             car.update(map_mask, cars)
