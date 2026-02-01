@@ -315,8 +315,12 @@ def run_simulation(genomes, config):
         car.check_radar(map_mask)
 
     current_max_frames = MAX_FRAMES_PRO if is_challenge_end else MAX_FRAMES_TRAINING
+    
+    # Store last leader position for when all cars die
+    last_leader_pos = None
+    last_leader_angle = 0
 
-    while running and len(cars) > 0:
+    while running and frame_count <= current_max_frames:
         frame_count += 1
         if frame_count > current_max_frames: 
             break
@@ -325,10 +329,14 @@ def run_simulation(genomes, config):
             if event.type == pygame.QUIT: 
                 sys.exit()
 
-        leader = max(cars, key=lambda c: c.gates_passed * 1000 + c.distance_traveled)
-        camera.update(leader)
-        for c in cars: 
-            c.is_leader = (c == leader)
+        # Handle case where all cars are dead but we still need to record
+        if len(cars) > 0:
+            leader = max(cars, key=lambda c: c.gates_passed * 1000 + c.distance_traveled)
+            last_leader_pos = leader.position
+            last_leader_angle = leader.angle
+            camera.update(leader)
+            for c in cars: 
+                c.is_leader = (c == leader)
 
         for i, car in enumerate(cars):
             if not car.alive: 
@@ -369,9 +377,11 @@ def run_simulation(genomes, config):
                 gate_bonus = 500 + (speed_at_gate * 200)
                 ge[i].fitness += gate_bonus
             
-            # Survival bonus (stay alive longer = better)
+            # Survival bonus (stay alive longer = better) - scaled by time
             if car.alive:
-                ge[i].fitness += 2.0
+                # Increasing bonus the longer they survive (exponential)
+                survival_bonus = 2.0 + (frame_count / 300) * 3.0  # 2.0 to 11.0 over 30s
+                ge[i].fitness += survival_bonus
             
             # Speed reward (pros go fast)
             speed_ratio = car.velocity.length() / car.max_speed
@@ -394,13 +404,13 @@ def run_simulation(genomes, config):
             heading_bonus = max(0, 1.0 - abs(gps[0]))  # gps[0] is heading error
             ge[i].fitness += heading_bonus * 0.3
             
-            # Death penalty
+            # Death penalty - SEVERE to teach cars to stay alive
             if not car.alive:
-                ge[i].fitness -= 150  # Reduced from 200 (less harsh)
+                ge[i].fitness -= 1000  # Heavy penalty for dying (was -150)
             
-            # Stagnation penalty (not progressing)
-            if car.frames_since_gate > 100:
-                ge[i].fitness -= 30
+            # Stagnation penalty (not progressing) - more lenient for pro driving
+            if car.frames_since_gate > 180:  # 6 seconds instead of 3.3 (was 100)
+                ge[i].fitness -= 50  # Increased penalty (was 30)
             
             # Lap completion - massive reward
             if car.gates_passed >= len(checkpoints):
@@ -421,7 +431,9 @@ def run_simulation(genomes, config):
                 car.draw(screen, camera)
 
             try:
-                simulation.draw_hud(screen, leader, GENERATION, frame_count, checkpoints, display_name)
+                # Use leader if available, otherwise use last known position
+                hud_leader = leader if len(cars) > 0 else None
+                simulation.draw_hud(screen, hud_leader, GENERATION, frame_count, checkpoints, display_name)
             except Exception as e:
                 print(f"⚠️  HUD error: {e}, using simple display")
                 font = pygame.font.SysFont("arial", 90, bold=True)
