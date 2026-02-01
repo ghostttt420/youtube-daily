@@ -152,13 +152,10 @@ def create_segment(clip_path, target_duration, caption, color_hex, day_num, allo
                 clip = concatenate_videoclips([clip] * loops_needed)
                 clip = clip.subclip(0, target_duration)
             else:
-                # For pro segment: use full clip, slow down slightly if needed
-                logger.info(f"  Using full clip {clip.duration:.1f}s (no loop)")
-                if clip.duration < target_duration:
-                    # Slow down to extend duration
-                    speed_factor = clip.duration / target_duration
-                    clip = clip.fx(lambda c: c.speedx(speed_factor))
-                    logger.info(f"  Slowed down to {speed_factor:.2f}x speed")
+                # For pro segment: use full clip as-is, do NOT slow down
+                logger.info(f"  Using full clip {clip.duration:.1f}s (no loop, no speed change)")
+                # Just trim if longer, use as-is if shorter (no slowing down)
+                clip = clip.subclip(0, min(clip.duration, target_duration))
         
         # Add caption text (appears briefly at start then disappears)
         try:
@@ -211,25 +208,27 @@ def create_triple_short(clips, strategy, output_name):
     
     day = strategy.get('day', 1)
     
-    # Select clips based on performance (duration = survival time)
+    # Select clips from consecutive generations (same theme)
+    # Shuffle to pick a random contiguous block of 3 clips
     if len(clips) == 1:
-        # Use same clip for all segments
         worst = middle = best = clips[0]
         logger.info("Using single clip for all segments")
     elif len(clips) == 2:
-        # Use first as worst, second as best
         worst = clips[0]
         middle = best = clips[1]
         logger.info("Using 2 clips: worst and best")
     else:
-        # Score by duration and pick worst/middle/best
-        scored = [(c, get_clip_duration(c)) for c in clips]
-        scored.sort(key=lambda x: x[1])  # Sort by duration (worst first)
+        # Pick 3 consecutive clips (same theme) randomly from available clips
+        # This ensures all segments use the same visual theme
+        max_start = len(clips) - 3
+        start_idx = random.randint(0, max(0, max_start))
         
-        worst = scored[0][0]
-        middle = scored[len(scored) // 2][0]
-        best = scored[-1][0]
-        logger.info(f"Selected clips: worst={scored[0][1]:.1f}s, mid={scored[len(scored)//2][1]:.1f}s, best={scored[-1][1]:.1f}s")
+        # Use consecutive clips: first=worst, second=learning, third=best
+        worst = clips[start_idx]
+        middle = clips[start_idx + 1]
+        best = clips[start_idx + 2]
+        
+        logger.info(f"Selected consecutive clips [{start_idx}:{start_idx+3}] for consistent theme")
     
     segments = []
     
