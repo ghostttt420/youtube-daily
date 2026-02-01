@@ -363,8 +363,10 @@ class TrackGenerator:
             left_curb.append((int(left_curb_pt.x), int(left_curb_pt.y)))
             right_curb.append((int(right_curb_pt.x), int(right_curb_pt.y)))
 
-        # 1. Create physics collision mask (drivable area inside right_edge)
-        pygame.draw.polygon(phys_surf, (255, 255, 255), right_edge)
+        # 1. Create physics collision mask (drivable track area between edges)
+        # Create ring polygon: left_edge forward, then right_edge backward
+        track_polygon = left_edge + right_edge[::-1]
+        pygame.draw.polygon(phys_surf, (255, 255, 255), track_polygon)
 
         # 2. Draw outer wall/barrier (beyond left_edge) and create wall collision mask
         wall_points = []
