@@ -159,7 +159,7 @@ class Car:
                     mid_point = (self.position + other.position) / 2
                     self.particles.append([mid_point, random.randint(10, 20)])
 
-    def update(self, map_mask, other_cars=None):
+    def update(self, map_mask, other_cars=None, wall_mask=None):
         if not self.alive: return
         self.frames_since_gate += 1
         if self.frames_since_gate > 120:
@@ -194,10 +194,19 @@ class Car:
         self.acceleration = 0
         self.steering = 0
 
+        # Check track boundary collision
         try:
             if map_mask.get_at((int(self.position.x), int(self.position.y))) == 0:
                 self.alive = False
         except: self.alive = False
+        
+        # Check wall collision (if wall_mask provided)
+        if wall_mask is not None:
+            try:
+                if wall_mask.get_at((int(self.position.x), int(self.position.y))) == 1:
+                    # Hit the wall - bounce or crash
+                    self.alive = False  # Crash into wall
+            except: pass
 
     def check_radar(self, map_mask):
         self.radars.clear()
@@ -357,7 +366,7 @@ class TrackGenerator:
         # 1. Create physics collision mask (drivable area inside right_edge)
         pygame.draw.polygon(phys_surf, (255, 255, 255), right_edge)
 
-        # 2. Draw outer wall/barrier (beyond left_edge)
+        # 2. Draw outer wall/barrier (beyond left_edge) and create wall collision mask
         wall_points = []
         for i in range(len(centerline)):
             curr = pygame.math.Vector2(centerline[i])
@@ -374,6 +383,12 @@ class TrackGenerator:
         
         # Draw wall as thick line
         pygame.draw.polygon(vis_surf, COL_WALL, wall_points)
+        
+        # Create wall collision mask (for car collision detection)
+        wall_surf = pygame.Surface((WORLD_SIZE, WORLD_SIZE))
+        wall_surf.fill((0, 0, 0))
+        pygame.draw.polygon(wall_surf, (255, 255, 255), wall_points)
+        wall_mask = pygame.mask.from_surface(wall_surf)
 
         # 3. Draw alternating RED/WHITE curbs (between left_edge and left_curb)
         curb_segments = 24  # Number of curb segments
@@ -433,7 +448,7 @@ class TrackGenerator:
                     drawing_dash = True
                     dash_points = [(int(p1.x), int(p1.y))]
 
-        return (int(x_new[0]), int(y_new[0])), phys_surf, vis_surf, checkpoints, math.degrees(math.atan2(y_new[5]-y_new[0], x_new[5]-x_new[0]))
+        return (int(x_new[0]), int(y_new[0])), phys_surf, vis_surf, checkpoints, math.degrees(math.atan2(y_new[5]-y_new[0], x_new[5]-x_new[0])), wall_mask
 
 
 def draw_text_with_outline(screen, text, pos, size=100, color=(255,255,255), outline_color=(0,0,0), outline_width=3):
@@ -484,7 +499,7 @@ def draw_hud(screen, car, generation, frame_count, checkpoints, challenge_name=N
         color=(200, 200, 200)
     )
     
-    # Speed (top right) - color coded
+    # Speed (top right, smaller) - color coded
     speed_kmh = int(car.velocity.length() * 3.6)
     if speed_kmh > 80:
         speed_color = (0, 255, 100)  # Green - fast
@@ -496,8 +511,8 @@ def draw_hud(screen, car, generation, frame_count, checkpoints, challenge_name=N
     draw_text_with_outline(
         screen, 
         f"{speed_kmh} km/h", 
-        (WIDTH - 300, 30), 
-        size=70, 
+        (WIDTH - 250, 40), 
+        size=45, 
         color=speed_color
     )
     
@@ -505,44 +520,7 @@ def draw_hud(screen, car, generation, frame_count, checkpoints, challenge_name=N
     draw_text_with_outline(
         screen, 
         f"Gates: {car.gates_passed}", 
-        (WIDTH - 300, 120), 
-        size=60, 
+        (WIDTH - 250, 95), 
+        size=40, 
         color=(0, 255, 255)
     )
-    
-    # Progress bar (bottom of screen)
-    if checkpoints and len(checkpoints) > 0:
-        progress = min(car.gates_passed / len(checkpoints), 1.0)
-        bar_width = WIDTH - 100
-        bar_height = 40
-        bar_x = 50
-        bar_y = HEIGHT - 100
-        
-        # Background bar
-        pygame.draw.rect(screen, (40, 40, 50), (bar_x, bar_y, bar_width, bar_height), border_radius=20)
-        
-        # Progress fill (gradient effect) - FIX: Ensure integers
-        if progress > 0:
-            fill_width = int(bar_width * progress)
-            # Color transitions from red -> yellow -> green
-            if progress < 0.33:
-                fill_color = (255, int(progress * 3 * 255), 0)  # Red to Yellow
-            elif progress < 0.66:
-                fill_color = (int((1 - (progress - 0.33) * 3) * 255), 255, 0)  # Yellow to Green
-            else:
-                fill_color = (0, 255, int((progress - 0.66) * 3 * 255))  # Green to Cyan
-            
-            # Ensure all color values are valid integers
-            fill_color = tuple(max(0, min(255, int(c))) for c in fill_color)
-            
-            pygame.draw.rect(screen, fill_color, (bar_x, bar_y, fill_width, bar_height), border_radius=20)
-        
-        # Progress percentage text
-        progress_text = f"{int(progress * 100)}%"
-        draw_text_with_outline(
-            screen,
-            progress_text,
-            (WIDTH//2 - 60, HEIGHT - 105),
-            size=50,
-            color=(255, 255, 255)
-        )
