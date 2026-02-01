@@ -19,7 +19,7 @@ from themes import ThemeManager
 DAILY_GENERATIONS = 50  # Increased from 20
 VIDEO_OUTPUT_DIR = "training_clips"
 FPS = 30 
-MAX_FRAMES_PRO = 3600  # 2 minutes for final showcase
+MAX_FRAMES_PRO = 900  # 30 seconds for pro level showcase (30s * 30fps)
 MAX_FRAMES_TRAINING = 900  # 30 seconds for training clips (up from 450)
 
 if not os.path.exists(VIDEO_OUTPUT_DIR): os.makedirs(VIDEO_OUTPUT_DIR)
