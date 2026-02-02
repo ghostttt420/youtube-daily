@@ -1,37 +1,38 @@
 {
-    "theme_key": "TOXIC",
-    "map_seed": 478093,
+    "theme_key": "CYBER",
+    "map_seed": 77544,
     "physics": {
-        "friction": 0.95
+        "friction": 0.98
     },
     "visuals": {
         "bg": [
-            20,
-            30,
-            10
+            5,
+            0,
+            15
         ],
         "road": [
-            40,
-            60,
-            20
+            20,
+            20,
+            35
         ],
         "wall": [
-            100,
+            0,
             255,
-            0
+            255
         ],
         "center": [
-            200,
+            255,
             0,
             255
         ]
     },
     "meta": {
-        "title": "AI Survives the WASTELAND \u2622\ufe0f (Gen {gen})",
+        "title": "AI Street Racing at NIGHT \ud83c\udf03 (Gen {gen})",
         "tags": [
-            "post-apocalyptic",
-            "zombie",
-            "survival"
+            "cyberpunk",
+            "neon",
+            "drift",
+            "night"
         ]
     }
 }
