@@ -148,12 +148,12 @@ class Car:
                 # Push cars apart
                 push_vec = self.position - other.position
                 if push_vec.length() > 0:
-                    push_vec = push_vec.normalize() * 5
+                    push_vec = push_vec.normalize() * 8
                     self.position += push_vec
                     other.position -= push_vec
-                    # Bounce velocities
-                    self.velocity *= 0.5
-                    other.velocity *= 0.5
+                    # Medium bounce
+                    self.velocity *= -0.4
+                    other.velocity *= -0.4
 
     def cast_ray(self, degree, map_mask):
         length = 0
