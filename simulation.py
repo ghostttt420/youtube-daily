@@ -137,6 +137,24 @@ class Car:
         for degree in [-60, -30, 0, 30, 60]:
             self.cast_ray(degree, map_mask)
 
+    def handle_car_collision(self, other_cars):
+        """Bounce off other cars without dying."""
+        if not self.alive:
+            return
+        for other in other_cars:
+            if other is self or not other.alive:
+                continue
+            if self.rect.colliderect(other.rect):
+                # Push cars apart hard
+                push_vec = self.position - other.position
+                if push_vec.length() > 0:
+                    push_vec = push_vec.normalize() * 15
+                    self.position += push_vec
+                    other.position -= push_vec
+                    # Hard bounce
+                    self.velocity *= -0.8
+                    other.velocity *= -0.8
+
     def cast_ray(self, degree, map_mask):
         length = 0
         rad = math.radians(self.angle + degree)
