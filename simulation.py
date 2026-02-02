@@ -137,6 +137,17 @@ class Car:
         for degree in [-60, -30, 0, 30, 60]:
             self.cast_ray(degree, map_mask)
 
+    def check_car_collision(self, other_cars):
+        """Check collision with other cars. Returns True if collision detected."""
+        if not self.alive:
+            return False
+        for other in other_cars:
+            if other is self or not other.alive:
+                continue
+            if self.rect.colliderect(other.rect):
+                return True
+        return False
+
     def cast_ray(self, degree, map_mask):
         length = 0
         rad = math.radians(self.angle + degree)

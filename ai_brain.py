@@ -265,6 +265,12 @@ def run_simulation(genomes, config):
             if not car.alive and car.frames_since_gate > 450:
                  ge[i].fitness -= 20
 
+        # Check car-to-car collisions
+        for i, car in enumerate(cars):
+            if car.alive and car.check_car_collision(cars):
+                car.alive = False
+                ge[i].fitness -= 100  # Small penalty for crashing into another car
+
         for i in range(len(cars) - 1, -1, -1):
             if not cars[i].alive:
                 cars.pop(i)
