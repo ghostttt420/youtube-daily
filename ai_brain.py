@@ -188,14 +188,10 @@ def run_simulation(genomes, config):
     map_mask = pygame.mask.from_surface(track_surface)
     camera = simulation.Camera(simulation.WORLD_SIZE, simulation.WORLD_SIZE)
 
-    for i, (_, g) in enumerate(genomes):
+    for _, g in genomes:
         net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
-        # Slight offset so cars don't start exactly on top of each other
-        offset_x = (i % 5) * 8
-        offset_y = (i // 5) * 8
-        car_pos = (start_pos[0] + offset_x, start_pos[1] + offset_y)
-        cars.append(simulation.Car(car_pos, start_angle)) 
+        cars.append(simulation.Car(start_pos, start_angle)) 
         g.fitness = 0
         ge.append(g)
 
@@ -268,11 +264,6 @@ def run_simulation(genomes, config):
 
             if not car.alive and car.frames_since_gate > 450:
                  ge[i].fitness -= 20
-
-        # Handle car-to-car collisions (bounce off, don't die)
-        for i, car in enumerate(cars):
-            if car.alive:
-                car.handle_car_collision(cars)
 
         for i in range(len(cars) - 1, -1, -1):
             if not cars[i].alive:
