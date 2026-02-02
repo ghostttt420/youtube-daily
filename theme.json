@@ -1,38 +1,38 @@
 {
-    "theme_key": "LAVA",
-    "map_seed": 707924,
+    "theme_key": "ICE",
+    "map_seed": 199474,
     "physics": {
-        "friction": 0.94
+        "friction": 0.93
     },
     "visuals": {
         "bg": [
-            40,
-            5,
-            5
+            220,
+            245,
+            255
         ],
         "road": [
-            80,
-            20,
-            20
+            160,
+            210,
+            255
         ],
         "wall": [
-            255,
-            80,
-            0
+            0,
+            100,
+            220
         ],
         "center": [
-            255,
-            255,
-            0
+            200,
+            240,
+            255
         ]
     },
     "meta": {
-        "title": "AI Races on LAVA \ud83d\udd25 (Gen {gen})",
+        "title": "AI Tries Drifting on ICE \u2744\ufe0f (Gen {gen})",
         "tags": [
-            "lava",
-            "hot",
-            "danger",
-            "volcano"
+            "drift",
+            "ice",
+            "winter",
+            "rally"
         ]
     }
 }
