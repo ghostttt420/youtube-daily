@@ -113,9 +113,7 @@ class Car:
             self.velocity.scale_to_length(self.max_speed)
             
         if self.velocity.length() > 2:
-            # Cap steering at high speeds to prevent spins
-            effective_speed = min(self.velocity.length(), 18)
-            self.angle += self.steering * effective_speed * self.turn_speed
+            self.angle += self.steering * self.velocity.length() * self.turn_speed
             
             if abs(self.steering) > 0.5 and self.velocity.length() > 15:
                 if random.random() < 0.3:
@@ -147,15 +145,16 @@ class Car:
             if other is self or not other.alive:
                 continue
             if self.rect.colliderect(other.rect):
-                # Push cars apart hard
+                # Strong separation so they don't stick
                 push_vec = self.position - other.position
-                if push_vec.length() > 0:
-                    push_vec = push_vec.normalize() * 15
+                dist = push_vec.length()
+                if dist > 0:
+                    push_vec = push_vec.normalize() * 35
                     self.position += push_vec
                     other.position -= push_vec
-                    # Hard bounce
-                    self.velocity *= -0.8
-                    other.velocity *= -0.8
+                # Bounce velocities away from each other
+                self.velocity *= -0.7
+                other.velocity *= -0.7
 
     def cast_ray(self, degree, map_mask):
         length = 0
