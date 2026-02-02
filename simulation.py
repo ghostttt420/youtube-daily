@@ -145,15 +145,15 @@ class Car:
             if other is self or not other.alive:
                 continue
             if self.rect.colliderect(other.rect):
-                # Push cars apart
+                # Push cars apart hard
                 push_vec = self.position - other.position
                 if push_vec.length() > 0:
-                    push_vec = push_vec.normalize() * 8
+                    push_vec = push_vec.normalize() * 15
                     self.position += push_vec
                     other.position -= push_vec
-                    # Medium bounce
-                    self.velocity *= -0.4
-                    other.velocity *= -0.4
+                    # Hard bounce
+                    self.velocity *= -0.8
+                    other.velocity *= -0.8
 
     def cast_ray(self, degree, map_mask):
         length = 0
