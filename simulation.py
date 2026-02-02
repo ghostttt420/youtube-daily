@@ -145,16 +145,16 @@ class Car:
             if other is self or not other.alive:
                 continue
             if self.rect.colliderect(other.rect):
-                # Strong separation so they don't stick
+                # Gentle separation so they don't stick
                 push_vec = self.position - other.position
                 dist = push_vec.length()
                 if dist > 0:
-                    push_vec = push_vec.normalize() * 35
+                    push_vec = push_vec.normalize() * 8
                     self.position += push_vec
                     other.position -= push_vec
                 # Bounce velocities away from each other
-                self.velocity *= -0.7
-                other.velocity *= -0.7
+                self.velocity *= -0.5
+                other.velocity *= -0.5
 
     def cast_ray(self, degree, map_mask):
         length = 0

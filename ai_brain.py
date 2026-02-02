@@ -188,10 +188,14 @@ def run_simulation(genomes, config):
     map_mask = pygame.mask.from_surface(track_surface)
     camera = simulation.Camera(simulation.WORLD_SIZE, simulation.WORLD_SIZE)
 
-    for _, g in genomes:
+    for i, (_, g) in enumerate(genomes):
         net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
-        cars.append(simulation.Car(start_pos, start_angle)) 
+        # Slight offset so cars don't start exactly on top of each other
+        offset_x = (i % 5) * 8
+        offset_y = (i // 5) * 8
+        car_pos = (start_pos[0] + offset_x, start_pos[1] + offset_y)
+        cars.append(simulation.Car(car_pos, start_angle)) 
         g.fitness = 0
         ge.append(g)
 
