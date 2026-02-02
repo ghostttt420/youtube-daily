@@ -1,37 +1,37 @@
 {
-    "theme_key": "CIRCUIT",
-    "map_seed": 963713,
+    "theme_key": "TOXIC",
+    "map_seed": 118663,
     "physics": {
-        "friction": 0.97
+        "friction": 0.95
     },
     "visuals": {
         "bg": [
+            20,
             30,
-            35,
-            30
+            10
         ],
         "road": [
-            50,
-            50,
-            55
+            40,
+            60,
+            20
         ],
         "wall": [
-            200,
-            0,
+            100,
+            255,
             0
         ],
         "center": [
-            255,
-            255,
+            200,
+            0,
             255
         ]
     },
     "meta": {
-        "title": "AI Learns to Race F1 Style \ud83c\udfce\ufe0f (Gen {gen})",
+        "title": "AI Survives the WASTELAND \u2622\ufe0f (Gen {gen})",
         "tags": [
-            "f1",
-            "racing",
-            "motorsport"
+            "post-apocalyptic",
+            "zombie",
+            "survival"
         ]
     }
 }
