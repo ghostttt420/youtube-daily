@@ -36,10 +36,10 @@ class Car:
         self.angle = start_angle 
         self.acceleration = 0.0
         self.steering = 0.0
-        self.max_speed = 29      
+        self.max_speed = THEME["physics"]["max_speed"]      
         self.friction = THEME["physics"]["friction"] 
-        self.acceleration_rate = 1.2
-        self.turn_speed = 0.12  # Reduced from 0.18 to prevent spinning   
+        self.acceleration_rate = THEME["physics"]["acceleration_rate"]
+        self.turn_speed = THEME["physics"]["turn_speed"]   
         self.alive = True
         self.distance_traveled = 0 
         self.is_leader = False

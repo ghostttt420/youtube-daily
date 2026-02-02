@@ -2,10 +2,10 @@
   "theme_key": "DESERT",
   "map_seed": 302547,
   "physics": {
-    "friction": 0.96,
-    "max_speed": 15,
-    "turn_speed": 0.25,
-    "acceleration_rate": 0.6
+    "friction": 0.97,
+    "max_speed": 29,
+    "turn_speed": 0.18,
+    "acceleration_rate": 1.2
   },
   "visuals": {
     "bg": [
