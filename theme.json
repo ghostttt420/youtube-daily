@@ -1,38 +1,38 @@
 {
-    "theme_key": "DESERT",
-    "map_seed": 302547,
+    "theme_key": "RETRO",
+    "map_seed": 462378,
     "physics": {
-        "friction": 0.955
+        "friction": 0.975
     },
     "visuals": {
         "bg": [
-            160,
-            60,
-            30
+            35,
+            0,
+            50
         ],
         "road": [
-            210,
-            140,
+            60,
+            0,
             90
         ],
         "wall": [
-            90,
-            40,
-            10
+            255,
+            0,
+            150
         ],
         "center": [
+            0,
             255,
-            200,
-            150
+            255
         ]
     },
     "meta": {
-        "title": "AI Rallies on MARS \ud83d\ude80 (Gen {gen})",
+        "title": "AI 80s Retro Run \ud83d\udd79\ufe0f (Gen {gen})",
         "tags": [
-            "rally",
-            "offroad",
-            "mars",
-            "space"
+            "synthwave",
+            "80s",
+            "retro",
+            "arcade"
         ]
     }
 }

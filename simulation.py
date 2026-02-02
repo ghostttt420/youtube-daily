@@ -137,6 +137,24 @@ class Car:
         for degree in [-60, -30, 0, 30, 60]:
             self.cast_ray(degree, map_mask)
 
+    def handle_car_collision(self, other_cars):
+        """Bounce off other cars without dying."""
+        if not self.alive:
+            return
+        for other in other_cars:
+            if other is self or not other.alive:
+                continue
+            if self.rect.colliderect(other.rect):
+                # Push cars apart hard
+                push_vec = self.position - other.position
+                if push_vec.length() > 0:
+                    push_vec = push_vec.normalize() * 15
+                    self.position += push_vec
+                    other.position -= push_vec
+                    # Hard bounce
+                    self.velocity *= -0.8
+                    other.velocity *= -0.8
+
     def cast_ray(self, degree, map_mask):
         length = 0
         rad = math.radians(self.angle + degree)
@@ -227,13 +245,42 @@ class TrackGenerator:
         edge_color = (220, 220, 220)
         road_color = THEME["visuals"]["road"]
         
+        # === CONTINUOUS BASE LAYERS (no gaps) ===
         for p in brush_points:
             pygame.draw.circle(vis_surf, wall_color, (int(p[0]), int(p[1])), 250)
         for p in brush_points:
             pygame.draw.circle(vis_surf, edge_color, (int(p[0]), int(p[1])), 230)
         for p in brush_points:
             pygame.draw.circle(vis_surf, road_color, (int(p[0]), int(p[1])), 210)
+        
+        # === KERBS: Red/White alternating segments ===
+        # Draw kerb markings on top of the edge
+        segment_length = 60  # Length of each red/white segment
+        kerb_width = 20      # Width of kerb marking
+        
+        for i in range(0, len(smooth_points) - segment_length, segment_length * 2):
+            # Red segment
+            start_idx = i
+            end_idx = min(i + segment_length, len(smooth_points) - 1)
+            red_segment = smooth_points[start_idx:end_idx]
+            if len(red_segment) > 1:
+                pygame.draw.lines(vis_surf, (200, 0, 0), False, red_segment, kerb_width)
             
-        pygame.draw.lines(vis_surf, THEME["visuals"]["center"], True, smooth_points, 4)
+            # White segment
+            start_idx = i + segment_length
+            end_idx = min(start_idx + segment_length, len(smooth_points) - 1)
+            white_segment = smooth_points[start_idx:end_idx]
+            if len(white_segment) > 1:
+                pygame.draw.lines(vis_surf, (255, 255, 255), False, white_segment, kerb_width)
+        
+        # === DASHED CENTER LINE ===
+        dash_length = 40
+        gap_length = 30
+        for i in range(0, len(smooth_points) - dash_length, dash_length + gap_length):
+            start_idx = i
+            end_idx = min(i + dash_length, len(smooth_points) - 1)
+            dash_segment = smooth_points[start_idx:end_idx]
+            if len(dash_segment) > 1:
+                pygame.draw.lines(vis_surf, THEME["visuals"]["center"], False, dash_segment, 4)
         
         return (int(x_new[0]), int(y_new[0])), phys_surf, vis_surf, checkpoints, math.degrees(math.atan2(y_new[5]-y_new[0], x_new[5]-x_new[0]))

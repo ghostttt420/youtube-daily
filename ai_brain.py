@@ -265,6 +265,11 @@ def run_simulation(genomes, config):
             if not car.alive and car.frames_since_gate > 450:
                  ge[i].fitness -= 20
 
+        # Handle car-to-car collisions (bounce off, don't die)
+        for i, car in enumerate(cars):
+            if car.alive:
+                car.handle_car_collision(cars)
+
         for i in range(len(cars) - 1, -1, -1):
             if not cars[i].alive:
                 cars.pop(i)
