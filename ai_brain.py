@@ -244,18 +244,11 @@ def run_simulation(genomes, config):
             # For early gens, blend with checkpoint steering
             neat_steering = output[0]
             
-            if GENERATION <= 10:
-                # Training: mostly follow checkpoint
-                checkpoint_steering = -heading_error
-                car.steering = checkpoint_steering * 0.8 + neat_steering * 0.2
-            elif GENERATION <= 50:
-                # Improving: blend both
-                checkpoint_steering = -heading_error
-                car.steering = checkpoint_steering * 0.5 + neat_steering * 0.5
-            else:
-                # Pro (Gen 50+): pure trained NEAT - use output directly
-                # The NEAT from checkpoint 530 was trained to output steering directly
-                car.steering = neat_steering
+            # ORIGINAL BEHAVIOR (as trained in checkpoint 530)
+            if output[0] > 0.5:
+                car.input_steer(right=True)
+            elif output[0] < -0.5:
+                car.input_steer(left=True)
             
             car.input_gas()
             car.update(map_mask, cars)
