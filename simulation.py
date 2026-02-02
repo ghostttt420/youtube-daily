@@ -197,43 +197,157 @@ class Camera:
 class TrackGenerator:
     def __init__(self, seed):
         np.random.seed(seed)
+        self.center_x = WORLD_SIZE // 2
+        self.center_y = WORLD_SIZE // 2
+    
+    def _create_straight(self, start, angle_deg, length):
+        """Create a straight section."""
+        angle = math.radians(angle_deg)
+        end = (start[0] + length * math.cos(angle),
+               start[1] + length * math.sin(angle))
+        return end
+    
+    def _create_arc(self, center, start_angle, sweep_angle, radius, num_points=50):
+        """Create an arc (corner)."""
+        points = []
+        for i in range(num_points + 1):
+            t = i / num_points
+            angle = math.radians(start_angle + sweep_angle * t)
+            x = center[0] + radius * math.cos(angle)
+            y = center[1] + radius * math.sin(angle)
+            points.append((x, y))
+        return points
+    
+    def _calculate_arc_center(self, start_pos, entry_angle, radius, turn_direction):
+        """Calculate arc center given start position, entry angle, radius and direction."""
+        # Perpendicular to entry angle
+        perp_angle = math.radians(entry_angle + (90 if turn_direction == 'left' else -90))
+        center = (start_pos[0] + radius * math.cos(perp_angle),
+                  start_pos[1] + radius * math.sin(perp_angle))
+        return center
     
     def generate_track(self):
         phys_surf = pygame.Surface((WORLD_SIZE, WORLD_SIZE))
         vis_surf = pygame.Surface((WORLD_SIZE, WORLD_SIZE))
         
         phys_surf.fill((0,0,0)) 
-        vis_surf.fill(THEME["visuals"]["bg"]) 
+        vis_surf.fill(THEME["visuals"]["bg"])
         
-        points = []
-        for i in range(20):
-            angle = (i / 20) * 2 * math.pi
-            radius = np.random.randint(1100, 1800)
-            points.append((WORLD_SIZE // 2 + radius * math.cos(angle), WORLD_SIZE // 2 + radius * math.sin(angle)))
-        points.append(points[0]) 
+        # Track definition: list of (type, params)
+        # Types: 'straight' -> (length), 'corner' -> (radius, angle, direction)
+        # Build a proper race circuit layout
         
-        pts = np.array(points)
-        tck, u = splprep(pts.T, u=None, s=0.0, per=1)
-        u_new = np.linspace(u.min(), u.max(), 5000)
-        x_new, y_new = splev(u_new, tck, der=0)
-        smooth_points = list(zip(x_new, y_new))
+        track_sections = [
+            ('straight', 600),           # Main straight
+            ('corner', 250, 90, 'right'), # T1: 90° right
+            ('straight', 400),           # Short straight
+            ('corner', 200, 60, 'left'),  # T2: 60° left
+            ('straight', 350),           
+            ('corner', 300, 45, 'right'), # T3: sweeping right
+            ('corner', 300, 45, 'right'), # T4: continues
+            ('straight', 500),           # Back straight
+            ('corner', 200, 90, 'left'),  # T5: tight left
+            ('straight', 300),
+            ('corner', 400, 60, 'right'), # T6: long sweeping right
+            ('straight', 250),
+            ('corner', 180, 90, 'left'),  # T7: tight chicane entry
+            ('corner', 180, 90, 'right'), # T8: chicane exit
+            ('straight', 400),
+            ('corner', 350, 120, 'right'), # T9: hairpin-like
+            ('straight', 300),
+            ('corner', 250, 60, 'left'),   # T10: back to start
+        ]
         
-        checkpoints = smooth_points[::70]
+        # Generate track points
+        all_points = []
+        checkpoints = []
         
-        pygame.draw.lines(phys_surf, (255, 255, 255), True, smooth_points, 450) 
+        # Start position (main straight, pointing up/left diagonal)
+        current_pos = (self.center_x + 800, self.center_y + 600)
+        current_angle = 210  # Pointing up-left
         
-        brush_points = smooth_points[::10]
+        for section in track_sections:
+            section_type = section[0]
+            
+            if section_type == 'straight':
+                length = section[1]
+                # Add start point
+                if not all_points:
+                    all_points.append(current_pos)
+                    checkpoints.append(current_pos)
+                
+                # Calculate end of straight
+                end_pos = self._create_straight(current_pos, current_angle, length)
+                
+                # Add intermediate points along straight
+                num_points = max(2, int(length / 30))
+                for i in range(1, num_points + 1):
+                    t = i / num_points
+                    x = current_pos[0] + t * (end_pos[0] - current_pos[0])
+                    y = current_pos[1] + t * (end_pos[1] - current_pos[1])
+                    all_points.append((x, y))
+                
+                current_pos = end_pos
+                checkpoints.append(current_pos)
+                
+            elif section_type == 'corner':
+                radius = section[1]
+                turn_angle = section[2]
+                direction = section[3]
+                
+                # Calculate arc center
+                center = self._calculate_arc_center(current_pos, current_angle, radius, direction)
+                
+                # Calculate entry angle to arc center
+                dx = current_pos[0] - center[0]
+                dy = current_pos[1] - center[1]
+                start_arc_angle = math.degrees(math.atan2(dy, dx))
+                
+                # Sweep direction
+                sweep = turn_angle if direction == 'left' else -turn_angle
+                
+                # Generate arc points
+                arc_points = self._create_arc(center, start_arc_angle, sweep, radius, num_points=40)
+                all_points.extend(arc_points[1:])  # Skip first (it's current_pos)
+                
+                # Update current position and angle
+                current_pos = arc_points[-1]
+                current_angle = (current_angle + sweep) % 360
+                checkpoints.append(current_pos)
+        
+        # Close the loop smoothly
+        # Remove duplicate last point if close to first
+        if len(all_points) > 1:
+            first = all_points[0]
+            last = all_points[-1]
+            dist = math.hypot(first[0] - last[0], first[1] - last[1])
+            if dist < 100:
+                all_points.pop()
+        
+        # Draw physics surface (collision mask) - thick white line
+        pygame.draw.lines(phys_surf, (255, 255, 255), True, all_points, 450)
+        
+        # Draw visual track with proper layering
         wall_color = THEME["visuals"]["wall"]
         edge_color = (220, 220, 220)
         road_color = THEME["visuals"]["road"]
         
-        for p in brush_points:
-            pygame.draw.circle(vis_surf, wall_color, (int(p[0]), int(p[1])), 250)
-        for p in brush_points:
-            pygame.draw.circle(vis_surf, edge_color, (int(p[0]), int(p[1])), 230)
-        for p in brush_points:
-            pygame.draw.circle(vis_surf, road_color, (int(p[0]), int(p[1])), 210)
-            
-        pygame.draw.lines(vis_surf, THEME["visuals"]["center"], True, smooth_points, 4)
+        # Draw walls (outer boundary)
+        pygame.draw.lines(vis_surf, wall_color, True, all_points, 250)
         
-        return (int(x_new[0]), int(y_new[0])), phys_surf, vis_surf, checkpoints, math.degrees(math.atan2(y_new[5]-y_new[0], x_new[5]-x_new[0]))
+        # Draw edge lines
+        pygame.draw.lines(vis_surf, edge_color, True, all_points, 230)
+        
+        # Draw road surface
+        pygame.draw.lines(vis_surf, road_color, True, all_points, 210)
+        
+        # Draw center racing line
+        pygame.draw.lines(vis_surf, THEME["visuals"]["center"], True, all_points, 4)
+        
+        # Calculate start angle for car placement
+        start_angle = math.degrees(math.atan2(
+            all_points[5][1] - all_points[0][1],
+            all_points[5][0] - all_points[0][0]
+        ))
+        
+        return (int(all_points[0][0]), int(all_points[0][1])), phys_surf, vis_surf, checkpoints, start_angle
