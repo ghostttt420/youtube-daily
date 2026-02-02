@@ -1,38 +1,38 @@
 {
-    "theme_key": "RETRO",
-    "map_seed": 722533,
+    "theme_key": "CYBER",
+    "map_seed": 39471,
     "physics": {
-        "friction": 0.975
+        "friction": 0.98
     },
     "visuals": {
         "bg": [
-            35,
+            5,
             0,
-            50
+            15
         ],
         "road": [
-            60,
-            0,
-            90
+            20,
+            20,
+            35
         ],
         "wall": [
-            255,
             0,
-            150
+            255,
+            255
         ],
         "center": [
-            0,
             255,
+            0,
             255
         ]
     },
     "meta": {
-        "title": "AI 80s Retro Run \ud83d\udd79\ufe0f (Gen {gen})",
+        "title": "AI Street Racing at NIGHT \ud83c\udf03 (Gen {gen})",
         "tags": [
-            "synthwave",
-            "80s",
-            "retro",
-            "arcade"
+            "cyberpunk",
+            "neon",
+            "drift",
+            "night"
         ]
     }
 }
