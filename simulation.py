@@ -220,40 +220,49 @@ class TrackGenerator:
         
         checkpoints = smooth_points[::70]
         
-        # Physics mask - drivable area
         pygame.draw.lines(phys_surf, (255, 255, 255), True, smooth_points, 450) 
         
-        # === VISUAL TRACK RENDERING ===
+        brush_points = smooth_points[::10]
         wall_color = THEME["visuals"]["wall"]
+        edge_color = (220, 220, 220)
         road_color = THEME["visuals"]["road"]
-        center_color = THEME["visuals"]["center"]
         
-        # 1. Draw grass/background (already filled)
+        # === CONTINUOUS BASE LAYERS (no gaps) ===
+        for p in brush_points:
+            pygame.draw.circle(vis_surf, wall_color, (int(p[0]), int(p[1])), 250)
+        for p in brush_points:
+            pygame.draw.circle(vis_surf, edge_color, (int(p[0]), int(p[1])), 230)
+        for p in brush_points:
+            pygame.draw.circle(vis_surf, road_color, (int(p[0]), int(p[1])), 210)
         
-        # 2. Draw outer grass-to-curb transition area
-        pygame.draw.lines(vis_surf, wall_color, True, smooth_points, 250)
+        # === KERBS: Red/White alternating segments ===
+        # Draw kerb markings on top of the edge
+        segment_length = 60  # Length of each red/white segment
+        kerb_width = 20      # Width of kerb marking
         
-        # 3. Draw RED/WHITE KERBS (racing stripes) at track edge
-        # Alternate red and white segments around the track
-        kerb_points_red = smooth_points[::20]  # Every 20th point for red
-        kerb_points_white = smooth_points[10::20]  # Offset for white
+        for i in range(0, len(smooth_points) - segment_length, segment_length * 2):
+            # Red segment
+            start_idx = i
+            end_idx = min(i + segment_length, len(smooth_points) - 1)
+            red_segment = smooth_points[start_idx:end_idx]
+            if len(red_segment) > 1:
+                pygame.draw.lines(vis_surf, (200, 0, 0), False, red_segment, kerb_width)
+            
+            # White segment
+            start_idx = i + segment_length
+            end_idx = min(start_idx + segment_length, len(smooth_points) - 1)
+            white_segment = smooth_points[start_idx:end_idx]
+            if len(white_segment) > 1:
+                pygame.draw.lines(vis_surf, (255, 255, 255), False, white_segment, kerb_width)
         
-        for i in range(len(kerb_points_red) - 1):
-            pygame.draw.line(vis_surf, (200, 0, 0), 
-                           kerb_points_red[i], kerb_points_red[(i+1) % len(kerb_points_red)], 240)
-        
-        for i in range(len(kerb_points_white) - 1):
-            pygame.draw.line(vis_surf, (255, 255, 255), 
-                           kerb_points_white[i], kerb_points_white[(i+1) % len(kerb_points_white)], 240)
-        
-        # 4. Draw asphalt road
-        pygame.draw.lines(vis_surf, road_color, True, smooth_points, 210)
-        
-        # 5. Draw DASHED CENTER LINE (racing line style)
-        # Skip every other segment to create dashed effect
-        for i in range(0, len(smooth_points) - 1, 2):
-            if i + 1 < len(smooth_points):
-                pygame.draw.line(vis_surf, center_color, 
-                               smooth_points[i], smooth_points[i+1], 4)
+        # === DASHED CENTER LINE ===
+        dash_length = 40
+        gap_length = 30
+        for i in range(0, len(smooth_points) - dash_length, dash_length + gap_length):
+            start_idx = i
+            end_idx = min(i + dash_length, len(smooth_points) - 1)
+            dash_segment = smooth_points[start_idx:end_idx]
+            if len(dash_segment) > 1:
+                pygame.draw.lines(vis_surf, THEME["visuals"]["center"], False, dash_segment, 4)
         
         return (int(x_new[0]), int(y_new[0])), phys_surf, vis_surf, checkpoints, math.degrees(math.atan2(y_new[5]-y_new[0], x_new[5]-x_new[0]))
