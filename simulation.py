@@ -113,7 +113,9 @@ class Car:
             self.velocity.scale_to_length(self.max_speed)
             
         if self.velocity.length() > 2:
-            self.angle += self.steering * self.velocity.length() * self.turn_speed
+            # Cap steering at high speeds to prevent spins
+            effective_speed = min(self.velocity.length(), 18)
+            self.angle += self.steering * effective_speed * self.turn_speed
             
             if abs(self.steering) > 0.5 and self.velocity.length() > 15:
                 if random.random() < 0.3:
