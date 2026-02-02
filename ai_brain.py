@@ -244,10 +244,28 @@ def run_simulation(genomes, config):
             # For early gens, blend with checkpoint steering
             neat_steering = output[0]
             
-            # ORIGINAL BEHAVIOR (as trained in checkpoint 530)
-            if output[0] > 0.5:
+            # Hybrid driving: NEAT + hardcoded track following
+            # Works on ANY track shape (adapts to different seeds)
+            neat_steering = output[0]
+            heading_error = gps[0]  # -1 to 1, negative = checkpoint is left
+            
+            # Hardcoded: steer toward checkpoint (keeps car on track)
+            checkpoint_steering = -heading_error
+            
+            # Blend varies by generation for evolution effect:
+            # - Learning/Training: More checkpoint following (stays on track)
+            # - Pro: More NEAT (smooth but still track-aware)
+            if GENERATION <= 20:
+                blend = 0.7  # 70% checkpoint, 30% NEAT
+            else:
+                blend = 0.4  # 40% checkpoint, 60% NEAT (pro is smoother)
+            
+            final_steering = checkpoint_steering * blend + neat_steering * (1 - blend)
+            
+            # Apply steering
+            if final_steering > 0.3:
                 car.input_steer(right=True)
-            elif output[0] < -0.5:
+            elif final_steering < -0.3:
                 car.input_steer(left=True)
             
             car.input_gas()
