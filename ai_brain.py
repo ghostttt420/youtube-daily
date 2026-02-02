@@ -252,21 +252,22 @@ def run_simulation(genomes, config):
             # Hardcoded: steer toward checkpoint (keeps car on track)
             checkpoint_steering = -heading_error
             
-            # Blend varies by generation for evolution effect:
-            # - Learning/Training: More checkpoint following (stays on track)
-            # - Pro: More NEAT (smooth but still track-aware)
+            # Blend varies by generation for evolution effect
             if GENERATION <= 20:
                 blend = 0.7  # 70% checkpoint, 30% NEAT
             else:
                 blend = 0.4  # 40% checkpoint, 60% NEAT (pro is smoother)
             
-            final_steering = checkpoint_steering * blend + neat_steering * (1 - blend)
+            target_steering = checkpoint_steering * blend + neat_steering * (1 - blend)
             
-            # Apply steering
-            if final_steering > 0.3:
-                car.input_steer(right=True)
-            elif final_steering < -0.3:
-                car.input_steer(left=True)
+            # Smooth steering change (prevent jerky donuts)
+            if not hasattr(car, 'smoothed_steering'):
+                car.smoothed_steering = 0
+            # Gradually move toward target (70% old, 30% new)
+            car.smoothed_steering = car.smoothed_steering * 0.7 + target_steering * 0.3
+            
+            # Apply smoothed steering directly (proportional, not binary)
+            car.steering = max(-1.0, min(1.0, car.smoothed_steering * 0.8))  # Cap at 0.8
             
             car.input_gas()
             car.update(map_mask, cars)
