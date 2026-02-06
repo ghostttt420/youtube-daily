@@ -1,37 +1,38 @@
 {
-    "theme_key": "CIRCUIT",
-    "map_seed": 399405,
+    "theme_key": "JUNGLE",
+    "map_seed": 163707,
     "physics": {
-        "friction": 0.97
+        "friction": 0.96
     },
     "visuals": {
         "bg": [
-            30,
-            35,
-            30
-        ],
-        "road": [
-            50,
-            50,
-            55
-        ],
-        "wall": [
-            200,
             0,
+            40,
             0
         ],
+        "road": [
+            90,
+            70,
+            40
+        ],
+        "wall": [
+            30,
+            100,
+            30
+        ],
         "center": [
-            255,
-            255,
-            255
+            200,
+            200,
+            150
         ]
     },
     "meta": {
-        "title": "AI Learns to Race F1 Style \ud83c\udfce\ufe0f (Gen {gen})",
+        "title": "AI Offroad JUNGLE Run \ud83c\udf34 (Gen {gen})",
         "tags": [
-            "f1",
-            "racing",
-            "motorsport"
+            "jungle",
+            "offroad",
+            "4x4",
+            "mud"
         ]
     }
 }
