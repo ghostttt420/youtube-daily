@@ -1,38 +1,38 @@
 {
-    "theme_key": "ICE",
-    "map_seed": 427306,
+    "theme_key": "RETRO",
+    "map_seed": 179617,
     "physics": {
-        "friction": 0.93
+        "friction": 0.975
     },
     "visuals": {
         "bg": [
-            220,
-            245,
-            255
+            35,
+            0,
+            50
         ],
         "road": [
-            160,
-            210,
-            255
+            60,
+            0,
+            90
         ],
         "wall": [
+            255,
             0,
-            100,
-            220
+            150
         ],
         "center": [
-            200,
-            240,
+            0,
+            255,
             255
         ]
     },
     "meta": {
-        "title": "AI Tries Drifting on ICE \u2744\ufe0f (Gen {gen})",
+        "title": "AI 80s Retro Run \ud83d\udd79\ufe0f (Gen {gen})",
         "tags": [
-            "drift",
-            "ice",
-            "winter",
-            "rally"
+            "synthwave",
+            "80s",
+            "retro",
+            "arcade"
         ]
     }
 }
