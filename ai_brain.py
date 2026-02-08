@@ -14,9 +14,9 @@ import random
 import simulation 
 
 # CONFIG
-# We run 20 NEW generations every day. 
-# If yesterday ended at Gen 50, today goes to Gen 70.
-DAILY_GENERATIONS = 20  
+# We run 50 NEW generations every day for faster evolution.
+# If yesterday ended at Gen 50, today goes to Gen 100.
+DAILY_GENERATIONS = 50  
 VIDEO_OUTPUT_DIR = "training_clips"
 FPS = 30 
 MAX_FRAMES_PRO = 1800 # 60s for final
@@ -256,11 +256,24 @@ def run_simulation(genomes, config):
             
             dist_score = 1.0 - gps[1] 
             ge[i].fitness += dist_score * 0.05
+            
+            # --- NEW: Center-of-track bonus (reduces off-road driving) ---
+            # If radar readings are symmetric, car is centered on track
+            if len(car.radars) >= 5:
+                left_dist = car.radars[0][1]  # -60 degrees
+                right_dist = car.radars[4][1]  # +60 degrees
+                # Calculate how centered the car is (1.0 = perfectly centered)
+                center_ratio = 1.0 - abs(left_dist - right_dist) / simulation.SENSOR_LENGTH
+                center_ratio = max(0, center_ratio)  # Clamp to 0
+                ge[i].fitness += center_ratio * 0.1  # Small bonus for staying centered
 
            
 
             if not car.alive:
                  ge[i].fitness -= 200
+                 # Additional penalty for dying early (off-road)
+                 if car.distance_traveled < 500:
+                     ge[i].fitness -= 100  # Extra penalty for immediate crashes
 
             if not car.alive and car.frames_since_gate > 450:
                  ge[i].fitness -= 20

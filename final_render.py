@@ -35,7 +35,7 @@ VIRAL_TITLES = [
     "AI Driving Fails vs Wins (Gen {gen})",
     "You won't believe how good this AI got! (Gen {gen})",
     "Satisfying AI Lines... Gen {gen} is CLEAN 🤤",
-    "Gen {gen}: The moment the AI became sentient 🏎️"
+    "Gen {gen}: The AI's final form 🏎️"
 ]
 
 def get_viral_title(generation):
@@ -109,8 +109,15 @@ def make_video():
                 print(f"⚠️ Text error: {e}")
             
         elif i == len(selected_files) - 1:
-            label = f"Gen {gen_num}: PRO LEVEL 🏎️"
-            color = '#00FF41' # Matrix Green
+            # Only call it PRO if it's actually performing well (completed at least one lap)
+            # gen_num represents the generation count, and at 50+ gens per day, it should be decent
+            is_actually_pro = gen_num >= 100
+            if is_actually_pro:
+                label = f"Gen {gen_num}: PRO LEVEL 🏎️"
+                color = '#00FF41' # Matrix Green
+            else:
+                label = f"Gen {gen_num}: IMPROVING 📈"
+                color = '#FFA500' # Orange - still learning
             engine_vol = 0.8
             
             try:
