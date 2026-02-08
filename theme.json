@@ -1,38 +1,38 @@
 {
-    "theme_key": "JUNGLE",
-    "map_seed": 8053,
+    "theme_key": "RETRO",
+    "map_seed": 906600,
     "physics": {
-        "friction": 0.96
+        "friction": 0.975
     },
     "visuals": {
         "bg": [
+            35,
             0,
-            40,
-            0
+            50
         ],
         "road": [
-            90,
-            70,
-            40
+            60,
+            0,
+            90
         ],
         "wall": [
-            30,
-            100,
-            30
+            255,
+            0,
+            150
         ],
         "center": [
-            200,
-            200,
-            150
+            0,
+            255,
+            255
         ]
     },
     "meta": {
-        "title": "AI Offroad JUNGLE Run \ud83c\udf34 (Gen {gen})",
+        "title": "AI 80s Retro Run \ud83d\udd79\ufe0f (Gen {gen})",
         "tags": [
-            "jungle",
-            "offroad",
-            "4x4",
-            "mud"
+            "synthwave",
+            "80s",
+            "retro",
+            "arcade"
         ]
     }
 }
