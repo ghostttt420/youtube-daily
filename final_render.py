@@ -35,7 +35,7 @@ VIRAL_TITLES = [
     "AI Driving Fails vs Wins (Gen {gen})",
     "You won't believe how good this AI got! (Gen {gen})",
     "Satisfying AI Lines... Gen {gen} is CLEAN 🤤",
-    "Gen {gen}: The moment the AI became sentient 🏎️"
+    "Gen {gen}: The AI's final form 🏎️"
 ]
 
 def get_viral_title(generation):
@@ -109,7 +109,7 @@ def make_video():
                 print(f"⚠️ Text error: {e}")
             
         elif i == len(selected_files) - 1:
-            label = f"Gen {gen_num}: PRO LEVEL 🏎️"
+            label = f"Gen {gen_num}: EVOLUTION 🏁"
             color = '#00FF41' # Matrix Green
             engine_vol = 0.8
             

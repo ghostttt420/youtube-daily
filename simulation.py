@@ -246,17 +246,18 @@ class TrackGenerator:
         road_color = THEME["visuals"]["road"]
         
         # === CONTINUOUS BASE LAYERS (no gaps) ===
+        # Thicker walls for better visibility (addresses "road have borders" feedback)
         for p in brush_points:
-            pygame.draw.circle(vis_surf, wall_color, (int(p[0]), int(p[1])), 250)
+            pygame.draw.circle(vis_surf, wall_color, (int(p[0]), int(p[1])), 260)  # Was 250
         for p in brush_points:
-            pygame.draw.circle(vis_surf, edge_color, (int(p[0]), int(p[1])), 230)
+            pygame.draw.circle(vis_surf, edge_color, (int(p[0]), int(p[1])), 235)  # Was 230
         for p in brush_points:
             pygame.draw.circle(vis_surf, road_color, (int(p[0]), int(p[1])), 210)
         
         # === KERBS: Red/White alternating segments ===
         # Draw kerb markings on top of the edge
         segment_length = 60  # Length of each red/white segment
-        kerb_width = 20      # Width of kerb marking
+        kerb_width = 28      # Width of kerb marking (was 20, now more visible)
         
         for i in range(0, len(smooth_points) - segment_length, segment_length * 2):
             # Red segment
