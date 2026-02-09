@@ -6,8 +6,11 @@ import numpy as np
 import pygame
 from scipy.interpolate import splev, splprep
 
+from __future__ import annotations
+
 from src.constants import Visuals
 from src.config import get_daily_theme
+from src.config.themes import ColorScheme
 
 
 class TrackGenerator:
@@ -139,7 +142,7 @@ class TrackGenerator:
         self,
         surface: pygame.Surface,
         points: list[tuple[float, float]],
-        colors: dict | "ColorScheme",
+        colors: dict | ColorScheme,
     ) -> None:
         """Draw the visual track with walls, kerbs, and center line.
         
