@@ -1,38 +1,38 @@
 {
-  "theme_key": "JUNGLE",
-  "map_seed": 787620,
+  "theme_key": "CYBER",
+  "map_seed": 985525,
   "physics": {
-    "friction": 0.96
+    "friction": 0.98
   },
   "visuals": {
     "bg": [
+      5,
       0,
-      40,
-      0
+      15
     ],
     "road": [
-      90,
-      70,
-      40
+      20,
+      20,
+      35
     ],
     "wall": [
-      30,
-      100,
-      30
+      0,
+      255,
+      255
     ],
     "center": [
-      200,
-      200,
-      150
+      255,
+      0,
+      255
     ]
   },
   "meta": {
-    "title": "AI Offroad JUNGLE Run \ud83c\udf34 (Gen {gen})",
+    "title": "AI Street Racing at NIGHT \ud83c\udf03 (Gen {gen})",
     "tags": [
-      "jungle",
-      "offroad",
-      "4x4",
-      "mud"
+      "cyberpunk",
+      "neon",
+      "drift",
+      "night"
     ]
   }
 }
