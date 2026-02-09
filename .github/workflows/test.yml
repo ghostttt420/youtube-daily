@@ -1,0 +1,108 @@
+name: Test & Lint
+
+on:
+  push:
+    branches:
+      - refactor/professional-engineering
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.11"
+  SDL_VIDEODRIVER: dummy
+  SDL_AUDIODRIVER: dummy
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install black ruff mypy
+
+      - name: Check formatting with Black
+        run: black --check src tests
+
+      - name: Lint with Ruff
+        run: ruff check src tests
+
+      - name: Type check with mypy
+        run: mypy src
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsdl2-dev
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest -v --tb=short
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        if: always()
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsdl2-dev
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Test CLI imports
+        run: |
+          python -c "from src.cli import cli; print('CLI import OK')"
+          python -c "from src.simulation import Car, Camera, TrackGenerator; print('Simulation import OK')"
+          python -c "from src.ai import EvolutionTrainer; print('AI import OK')"
+          python -c "from src.config import get_settings; print('Config import OK')"
+
+      - name: Test CLI --help
+        run: python -m src.cli --help
+
+      - name: Test CLI status (no env vars)
+        run: python -m src.cli status || true
