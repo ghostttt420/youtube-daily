@@ -1,16 +1,16 @@
 """Procedural track generation."""
 
+from __future__ import annotations
+
 import math
 
 import numpy as np
 import pygame
 from scipy.interpolate import splev, splprep
 
-from __future__ import annotations
-
-from src.constants import Visuals
 from src.config import get_daily_theme
 from src.config.themes import ColorScheme
+from src.constants import Visuals
 
 
 class TrackGenerator:
