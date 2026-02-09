@@ -1,38 +1,38 @@
 {
-    "theme_key": "RETRO",
-    "map_seed": 541214,
+    "theme_key": "MIDNIGHT",
+    "map_seed": 691916,
     "physics": {
-        "friction": 0.975
+        "friction": 0.965
     },
     "visuals": {
         "bg": [
-            35,
-            0,
-            50
+            10,
+            10,
+            10
         ],
         "road": [
-            60,
-            0,
-            90
+            40,
+            40,
+            40
         ],
         "wall": [
             255,
-            0,
-            150
+            215,
+            0
         ],
         "center": [
-            0,
+            255,
             255,
             255
         ]
     },
     "meta": {
-        "title": "AI 80s Retro Run \ud83d\udd79\ufe0f (Gen {gen})",
+        "title": "AI Tokyo Drift Run \ud83c\uddef\ud83c\uddf5 (Gen {gen})",
         "tags": [
-            "synthwave",
-            "80s",
-            "retro",
-            "arcade"
+            "jdm",
+            "tokyo",
+            "drift",
+            "japan"
         ]
     }
 }
