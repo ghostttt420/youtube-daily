@@ -1,38 +1,38 @@
 {
-    "theme_key": "RETRO",
-    "map_seed": 241918,
+    "theme_key": "LAVA",
+    "map_seed": 455800,
     "physics": {
-        "friction": 0.975
+        "friction": 0.94
     },
     "visuals": {
         "bg": [
-            35,
-            0,
-            50
+            40,
+            5,
+            5
         ],
         "road": [
-            60,
-            0,
-            90
+            80,
+            20,
+            20
         ],
         "wall": [
             255,
-            0,
-            150
+            80,
+            0
         ],
         "center": [
-            0,
             255,
-            255
+            255,
+            0
         ]
     },
     "meta": {
-        "title": "AI 80s Retro Run \ud83d\udd79\ufe0f (Gen {gen})",
+        "title": "AI Races on LAVA \ud83d\udd25 (Gen {gen})",
         "tags": [
-            "synthwave",
-            "80s",
-            "retro",
-            "arcade"
+            "lava",
+            "hot",
+            "danger",
+            "volcano"
         ]
     }
 }
