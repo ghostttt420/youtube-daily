@@ -8,7 +8,7 @@ import numpy as np
 import pygame
 from scipy.interpolate import splev, splprep
 
-from src.config import get_daily_theme
+from src.config import load_theme
 from src.config.themes import ColorScheme
 from src.constants import Visuals
 
@@ -44,8 +44,8 @@ class TrackGenerator:
         Returns:
             Tuple of (start_pos, physics_surface, visual_surface, checkpoints, start_angle)
         """
-        theme = get_daily_theme()
-        colors = theme.visuals if theme else self._default_colors()
+        theme = load_theme()
+        colors = theme.colors if theme else self._default_colors()
         
         # Create surfaces
         phys_surf = pygame.Surface((world_size, world_size))
