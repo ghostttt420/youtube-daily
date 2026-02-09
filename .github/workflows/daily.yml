@@ -1,6 +1,9 @@
 name: Project Evolution Daily
 
 on:
+  push:
+    branches:
+      - refactor/professional-engineering  # Run on pushes to this branch
   schedule:
     - cron: "0 9,16,23 * * *"  # Run at 9am, 4pm, 11pm UTC
   workflow_dispatch:  # Allow manual runs
