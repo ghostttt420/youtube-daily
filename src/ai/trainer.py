@@ -403,7 +403,7 @@ min_species_size   = 2
         
         theme = load_theme()
         seed = theme.map_seed if theme else 42
-        friction = theme.physics["friction"] if theme else 0.97
+        friction = theme.friction if theme else 0.97
         
         pygame.init()
         screen = pygame.display.set_mode(
