@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+
+# Project outputs
+training_clips/
+*.mp4
+voice.mp3
+background.mp4
+short.mp4
+evolution_short.mp4
+
+# Logs
+*.log
+logs/
+
+# Data - keep structure but not all checkpoints
+data/checkpoints/
+!data/checkpoints/.gitkeep
+
+# Assets (generated)
+assets/*.png
+!assets/.gitkeep
+
+# Local config overrides
+.env
+.env.local
+config.local.json
+
+# OS
+.DS_Store
+Thumbs.db

@@ -2,100 +2,101 @@ name: Project Evolution Daily
 
 on:
   schedule:
-   - cron: 0 9,16,23 * * *
-    
-  workflow_dispatch:
+    - cron: "0 9,16,23 * * *"  # Run at 9am, 4pm, 11pm UTC
+  workflow_dispatch:  # Allow manual runs
 
-# 🛡️ CONCURRENCY PROTECTION
-# Prevents race conditions. If a manual run starts while a schedule is running,
-# it waits for the first one to finish saving instead of crashing.
+# Concurrency protection - prevent race conditions
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.11"
+  SDL_VIDEODRIVER: dummy
+  SDL_AUDIODRIVER: dummy
+  IMAGEMAGICK_BINARY: /usr/bin/convert
 
 jobs:
   run_evolution:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # CRITICAL: Allows bot to push changes (save brains)
-
-    env:
-      SDL_VIDEODRIVER: dummy 
-      YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
-      YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
-      YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
-      IMAGEMAGICK_BINARY: /usr/bin/convert
-
+      contents: write  # Allow pushing checkpoints
+    
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetch full history for safer rebase
+          fetch-depth: 0
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
 
-      # 🛠️ UPDATED: Added Fonts for the new Viral Text Overlays
-      - name: Install Dependencies
+      - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg libsdl2-dev imagemagick fonts-dejavu fonts-liberation
+          sudo apt-get install -y \
+            ffmpeg \
+            libsdl2-dev \
+            imagemagick \
+            fonts-dejavu \
+            fonts-liberation
           sudo sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml
+
+      - name: Install Python Dependencies
+        run: |
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 1. GENERATE THEME (Colors/Physics)
-      - name: Daily Config
-        run: python daily_config.py
+      - name: Run Daily Pipeline
+        env:
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          ENV: production
+        run: |
+          python -m src.cli daily
 
-      # 2. PAINT ASSETS (Based on Theme)
-      - name: Generate Assets
-        run: python assets.py
+      - name: Cleanup Old Checkpoints
+        run: |
+          # Keep only the 5 most recent checkpoints to manage storage
+          ls -t neat-checkpoint-* 2>/dev/null | tail -n +6 | xargs -r rm -f --
 
-      # 3. EVOLVE (Reads checkpoints, runs sim)
-      - name: Run Simulation
-        run: python ai_brain.py
-
-      # 4. RENDER & UPLOAD
-      - name: Edit & Upload
-        run: python final_render.py
-
-      # 5. PERSISTENCE (The Brain Saver + Rebase Fix)
-      - name: Save Brain Progress
+      - name: Persist Evolution State
+        if: always()  # Run even if previous steps failed
         run: |
           git config --global user.name "Auto-Evolution Bot"
           git config --global user.email "bot@factghost.com"
           
-          # SMART CLEANUP: Keep only the newest checkpoint
-          ls -t neat-checkpoint-* | tail -n +2 | xargs -r rm --
+          # Stage checkpoint and theme
+          git add neat-checkpoint-* 2>/dev/null || true
+          git add theme.json 2>/dev/null || true
           
-          # 1. Stage ONLY the files we want to save
-          git add neat-checkpoint-*
-          git add theme.json
-          
-          # 2. Check if there are changes to commit
-          if git diff --staged --quiet; then
-             echo "No changes to commit."
+          # Commit if there are changes
+          if ! git diff --staged --quiet; then
+            git commit -m "🧠 Brain Evolution: Daily Update [skip ci]"
+            git pull --rebase origin ${{ github.ref_name }}
+            git push
           else
-             # 3. Create the Safe Save Point
-             git commit -m "🧠 Brain Evolution: Level Up [skip ci]"
-             
-             # 4. THE FIX: Wipe all other temporary changes (videos, cache, etc.)
-             # This makes the directory "clean" so the rebase won't complain.
-             git reset --hard HEAD
-             
-             # 5. NOW we can safely pull and push
-             git pull --rebase origin main
-             git push
+            echo "No changes to commit"
           fi
 
-      # 6. SAVE ARTIFACT (Download Video Manually)
       - name: Upload Video Artifact
-        if: always() 
-        # Run even if the YouTube upload failed
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ai-evolution-video
+          name: ai-evolution-video-${{ github.run_id }}
           path: evolution_short.mp4
+          retention-days: 7
+
+  notify:
+    needs: run_evolution
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify on Failure
+        run: |
+          echo "::error::Daily evolution run failed!"
+          echo "Check the workflow logs for details."
