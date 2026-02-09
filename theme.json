@@ -1,38 +1,38 @@
 {
-  "theme_key": "DESERT",
-  "map_seed": 214005,
+  "theme_key": "JUNGLE",
+  "map_seed": 787620,
   "physics": {
-    "friction": 0.955
+    "friction": 0.96
   },
   "visuals": {
     "bg": [
-      160,
-      60,
-      30
+      0,
+      40,
+      0
     ],
     "road": [
-      210,
-      140,
-      90
+      90,
+      70,
+      40
     ],
     "wall": [
-      90,
-      40,
-      10
+      30,
+      100,
+      30
     ],
     "center": [
-      255,
+      200,
       200,
       150
     ]
   },
   "meta": {
-    "title": "AI Rallies on MARS \ud83d\ude80 (Gen {gen})",
+    "title": "AI Offroad JUNGLE Run \ud83c\udf34 (Gen {gen})",
     "tags": [
-      "rally",
+      "jungle",
       "offroad",
-      "mars",
-      "space"
+      "4x4",
+      "mud"
     ]
   }
 }
