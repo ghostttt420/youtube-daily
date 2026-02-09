@@ -4,11 +4,11 @@ neat-python>=0.92
 numpy>=1.24.0,<2.0
 scipy>=1.10.0
 
-# Video processing
-moviepy>=1.0.3
-Pillow>=9.5.0
-imageio>=2.6.1
-imageio-ffmpeg>=0.4.9
+# Video processing - pinned for compatibility
+moviepy==1.0.3
+Pillow==9.5.0
+imageio==2.6.1
+imageio-ffmpeg==0.4.9
 
 # Configuration & Logging
 pydantic>=2.0.0
