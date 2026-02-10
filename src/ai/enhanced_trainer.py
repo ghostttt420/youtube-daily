@@ -24,6 +24,7 @@ from src.simulation import Camera, Car, TrackGenerator
 from src.utils.error_recovery import ErrorRecovery, SimulationCrash
 from src.utils.feature_flags import get_feature_flags
 from src.weather.system import WeatherSystem
+from src.weather.effects import WeatherEffects
 
 if TYPE_CHECKING:
     from neat.genome import DefaultGenome
@@ -86,6 +87,7 @@ class EnhancedEvolutionTrainer:
         self.tracker = get_tracker()
         self.curriculum = get_curriculum_manager()
         self.weather = WeatherSystem(enable_weather=self.flags.enable_weather)
+        self.weather_effects = WeatherEffects()
         self.recovery = ErrorRecovery()
         
         # Ghost system
@@ -346,6 +348,10 @@ min_species_size   = 2
         
         cars = [Car(self.start_pos, self.start_angle) for _ in range(40)]
         
+        # Load sprites for all cars
+        for car in cars:
+            car.load_sprites(self.settings.paths.assets_dir)
+        
         # Video setup
         video_path = self.settings.paths.clips_dir / "gen_00000.mp4"
         writer = imageio.get_writer(video_path, fps=Video.OUTPUT_FPS)
@@ -447,7 +453,9 @@ min_species_size   = 2
             
             # Car with curriculum-adjusted friction
             friction = self._get_friction()
-            cars.append(Car(self.start_pos, self.start_angle, friction=friction))
+            car = Car(self.start_pos, self.start_angle, friction=friction)
+            car.load_sprites(self.settings.paths.assets_dir)
+            cars.append(car)
             
             genome.fitness = 0.0
             genomes_list.append(genome)
@@ -685,6 +693,14 @@ min_species_size   = 2
                 if should_render:
                     screen.fill((30, 35, 30))
                     screen.blit(self.visual_map, (camera.camera.x, camera.camera.y))
+                    
+                    # Draw weather effects
+                    if self.flags.enable_weather and self.weather.current:
+                        self.weather_effects.update(screen.get_width(), screen.get_height())
+                        if self.weather.current.weather_type.value in [3, 4]:  # LIGHT_RAIN, HEAVY_RAIN
+                            self.weather_effects.draw_rain(screen, self.weather.current.intensity)
+                        if self.weather.current.weather_type.value == 5:  # FOG
+                            self.weather_effects.draw_fog(screen, self.weather.current.visibility)
                     
                     # Draw ghost
                     if self.current_ghost:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import random
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pygame
@@ -77,6 +78,35 @@ class Car:
         self.img_smoke: pygame.Surface | None = None
         self.rect = pygame.Rect(0, 0, 50, 85)
         self.rect.center = (int(self.position.x), int(self.position.y))
+    
+    def load_sprites(self, assets_dir: Path | str = "assets") -> None:
+        """Load car sprites from assets directory.
+        
+        Args:
+            assets_dir: Directory containing sprite files
+        """
+        assets_path = Path(assets_dir)
+        
+        def load_sprite(filename: str, scale_size: tuple[int, int] | None = None) -> pygame.Surface | None:
+            """Load a sprite image."""
+            path = assets_path / filename
+            if not path.exists():
+                return None
+            try:
+                img = pygame.image.load(str(path)).convert_alpha()
+                if scale_size:
+                    img = pygame.transform.scale(img, scale_size)
+                return img
+            except Exception:
+                return None
+        
+        self.sprite_norm = load_sprite("car_normal.png", (50, 85))
+        self.sprite_leader = load_sprite("car_leader.png", (50, 85))
+        self.img_smoke = load_sprite("particle_smoke.png", (32, 32))
+        
+        # Update rect if sprite loaded
+        if self.sprite_norm:
+            self.rect = self.sprite_norm.get_rect(center=self.position)
 
     def get_data(self, checkpoints: list[tuple[float, float]]) -> list[float]:
         """Get AI inputs for target direction and distance.
