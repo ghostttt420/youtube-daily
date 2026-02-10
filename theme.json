@@ -1,38 +1,37 @@
 {
-  "theme_key": "JUNGLE",
-  "map_seed": 217021,
+  "theme_key": "TOXIC",
+  "map_seed": 684447,
   "physics": {
-    "friction": 0.96
+    "friction": 0.95
   },
   "visuals": {
     "bg": [
-      0,
-      40,
-      0
+      20,
+      30,
+      10
     ],
     "road": [
-      90,
-      70,
-      40
+      40,
+      60,
+      20
     ],
     "wall": [
-      30,
       100,
-      30
+      255,
+      0
     ],
     "center": [
       200,
-      200,
-      150
+      0,
+      255
     ]
   },
   "meta": {
-    "title": "AI Offroad JUNGLE Run \ud83c\udf34 (Gen {gen})",
+    "title": "AI Survives the WASTELAND \u2622\ufe0f (Gen {gen})",
     "tags": [
-      "jungle",
-      "offroad",
-      "4x4",
-      "mud"
+      "post-apocalyptic",
+      "zombie",
+      "survival"
     ]
   }
 }
