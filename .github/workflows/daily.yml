@@ -53,12 +53,25 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Daily Pipeline
+      - name: Clean Old Data (Fresh Start)
+        run: |
+          # Remove old metrics database for fresh start
+          rm -f data/metrics.db
+          rm -rf data/ghosts/*
+          rm -rf data/crashes/*
+          rm -rf training_clips/*
+          echo "✅ Cleaned old data for fresh evolution"
+
+      - name: Run Daily Pipeline (Enhanced)
         env:
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
           ENV: production
+          FEATURE_CURRICULUM: true
+          FEATURE_WEATHER: true
+          FEATURE_GHOST_CARS: true
+          FEATURE_MULTI_OBJECTIVE: true
         run: |
           python -m src.cli daily
 

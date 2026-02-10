@@ -78,6 +78,19 @@ class PathsConfig(BaseSettings):
         return v
 
 
+class WandbConfig(BaseSettings):
+    """Weights & Biases configuration."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="WANDB_",
+        extra="ignore",
+    )
+
+    entity: str = Field(default="", description="Wandb entity/team")
+    project: str = Field(default="ai-racing-evolution", description="Wandb project name")
+    api_key: str = Field(default="", description="Wandb API key")
+
+
 class Settings(BaseSettings):
     """Global application settings."""
 
@@ -101,11 +114,18 @@ class Settings(BaseSettings):
     simulation: SimulationConfig = Field(default_factory=SimulationConfig)
     neat: NEATConfig = Field(default_factory=NEATConfig)
     paths: PathsConfig = Field(default_factory=PathsConfig)
+    wandb: WandbConfig = Field(default_factory=WandbConfig)
 
-    # Feature flags
+    # Feature flags (legacy - prefer feature_flags.json)
     enable_youtube_upload: bool = Field(default=True)
     enable_video_render: bool = Field(default=True)
     enable_sound: bool = Field(default=False)
+
+    @property
+    def feature_flags(self) -> dict:
+        """Get feature flags from file."""
+        from src.utils.feature_flags import get_feature_flags
+        return get_feature_flags().to_dict()
 
     @field_validator("youtube", mode="before")
     @classmethod
