@@ -99,10 +99,18 @@ class EnhancedEvolutionTrainer:
         self.start_pos: tuple[int, int] = (0, 0)
         self.start_angle: float = 0.0
         self.checkpoints: list[tuple[float, float]] = []
+        self._bg_color = (30, 35, 30)  # Default background color
         
         # Headless mode for server
         os.environ["SDL_VIDEODRIVER"] = "dummy"
         os.environ["SDL_AUDIODRIVER"] = "dummy"
+    
+    def _get_bg_color(self) -> tuple[int, int, int]:
+        """Get background color from current theme."""
+        theme = load_theme()
+        if theme:
+            return theme.colors.bg
+        return (30, 35, 30)
 
     def create_neat_config(self) -> None:
         """Create and validate NEAT configuration."""
@@ -391,7 +399,8 @@ min_species_size   = 2
                         car.update(self.map_mask)
                 
                 # Render
-                screen.fill((30, 35, 30))
+                bg_color = self._get_bg_color()
+                screen.fill(bg_color)
                 screen.blit(self.visual_map, (camera.camera.x, camera.camera.y))
                 for car in cars:
                     car.draw(screen, camera)
@@ -712,7 +721,8 @@ min_species_size   = 2
                 # Render
                 should_render = should_record or frame_count % Video.RECORD_EVERY_N_FRAMES == 0
                 if should_render:
-                    screen.fill((30, 35, 30))
+                    bg_color = self._get_bg_color()
+                    screen.fill(bg_color)
                     screen.blit(self.visual_map, (camera.camera.x, camera.camera.y))
                     
                     # Draw weather effects

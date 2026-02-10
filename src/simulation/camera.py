@@ -71,9 +71,10 @@ class Camera:
         self.exact_x += (target_x - self.exact_x) * 0.1
         self.exact_y += (target_y - self.exact_y) * 0.1
         
+        # Camera rect represents the viewport (what's visible on screen)
         self.camera = pygame.Rect(
             int(self.exact_x),
             int(self.exact_y),
-            self.width,
-            self.height,
+            self._viewport_width,
+            self._viewport_height,
         )
