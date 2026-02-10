@@ -229,8 +229,9 @@ class MetricsTracker:
         data = []
         for sid, species in species_set.species.items():
             fitnesses = [m.fitness for m in species.members.values() if m.fitness]
-            # Calculate age from created generation
-            age = getattr(species, 'age', self.generation - getattr(species, 'created', self.generation))
+            # Calculate age from created generation (use getattr for compatibility)
+            created_gen = getattr(species, 'created', 0)
+            age = self.current_generation - created_gen if hasattr(self, 'current_generation') else 0
             stagnant = getattr(species, 'stagnation', 0)
             data.append({
                 "id": sid,
