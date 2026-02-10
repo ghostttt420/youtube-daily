@@ -352,6 +352,14 @@ min_species_size   = 2
         for car in cars:
             car.load_sprites(self.settings.paths.assets_dir)
         
+        # Initialize camera to center on starting position
+        start_x = -self.start_pos[0] + self.settings.simulation.width / 2
+        start_y = -self.start_pos[1] + self.settings.simulation.height / 2
+        start_x = min(0, max(-(self.settings.simulation.world_size - self.settings.simulation.width), start_x))
+        start_y = min(0, max(-(self.settings.simulation.world_size - self.settings.simulation.height), start_y))
+        camera.exact_x = start_x
+        camera.exact_y = start_y
+        
         # Video setup
         video_path = self.settings.paths.clips_dir / "gen_00000.mp4"
         writer = imageio.get_writer(video_path, fps=Video.OUTPUT_FPS)
@@ -521,6 +529,16 @@ min_species_size   = 2
         # Load sprites for all cars (after pygame init)
         for car in cars:
             car.load_sprites(self.settings.paths.assets_dir)
+        
+        # Initialize camera to center on starting position (prevent off-screen start)
+        if cars:
+            start_x = -cars[0].position.x + self.settings.simulation.width / 2
+            start_y = -cars[0].position.y + self.settings.simulation.height / 2
+            # Clamp to world bounds
+            start_x = min(0, max(-(self.settings.simulation.world_size - self.settings.simulation.width), start_x))
+            start_y = min(0, max(-(self.settings.simulation.world_size - self.settings.simulation.height), start_y))
+            camera.exact_x = start_x
+            camera.exact_y = start_y
         
         # Determine recording
         is_first = self.generation == self.start_gen + 1
