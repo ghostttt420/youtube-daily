@@ -748,7 +748,7 @@ min_species_size   = 2
                         genomes[i].fitness += data.efficiency * 50
             
             # Save ghost from best performer
-            if self.flags.enable_ghost_cars:
+            if self.flags.enable_ghost_cars and eval_data:
                 best_idx = max(range(len(eval_data)), key=lambda i: eval_data[i].distance)
                 if best_idx < len(genomes):
                     ghost_frames = self.ghost_recorder.stop()
