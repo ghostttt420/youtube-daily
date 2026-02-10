@@ -454,14 +454,13 @@ min_species_size   = 2
             # Car with curriculum-adjusted friction
             friction = self._get_friction()
             car = Car(self.start_pos, self.start_angle, friction=friction)
-            car.load_sprites(self.settings.paths.assets_dir)
             cars.append(car)
             
             genome.fitness = 0.0
             genomes_list.append(genome)
             eval_data.append(CarEvaluationData())
         
-        # Run simulation
+        # Run simulation (sprites loaded after pygame init)
         self._simulate(cars, nets, genomes_list, eval_data)
         
         # Log metrics
@@ -518,6 +517,10 @@ min_species_size   = 2
         )
         camera = Camera(self.settings.simulation.world_size, self.settings.simulation.world_size)
         camera.set_viewport(self.settings.simulation.width, self.settings.simulation.height)
+        
+        # Load sprites for all cars (after pygame init)
+        for car in cars:
+            car.load_sprites(self.settings.paths.assets_dir)
         
         # Determine recording
         is_first = self.generation == self.start_gen + 1
