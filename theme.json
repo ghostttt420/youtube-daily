@@ -1,38 +1,38 @@
 {
-    "theme_key": "JUNGLE",
-    "map_seed": 13441,
+    "theme_key": "LAVA",
+    "map_seed": 910684,
     "physics": {
-        "friction": 0.96
+        "friction": 0.94
     },
     "visuals": {
         "bg": [
-            0,
             40,
-            0
+            5,
+            5
         ],
         "road": [
-            90,
-            70,
-            40
+            80,
+            20,
+            20
         ],
         "wall": [
-            30,
-            100,
-            30
+            255,
+            80,
+            0
         ],
         "center": [
-            200,
-            200,
-            150
+            255,
+            255,
+            0
         ]
     },
     "meta": {
-        "title": "AI Offroad JUNGLE Run \ud83c\udf34 (Gen {gen})",
+        "title": "AI Races on LAVA \ud83d\udd25 (Gen {gen})",
         "tags": [
-            "jungle",
-            "offroad",
-            "4x4",
-            "mud"
+            "lava",
+            "hot",
+            "danger",
+            "volcano"
         ]
     }
 }
