@@ -39,6 +39,8 @@ class GenerationMetrics:
     # Performance
     simulation_time: float = 0.0
     frames_simulated: int = 0
+    avg_fps: float = 0.0  # Average FPS during simulation
+    frames_simulated: int = 0
     
     # Best performer
     best_distance: float = 0.0

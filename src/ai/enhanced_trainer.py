@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import pickle
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -375,9 +376,11 @@ min_species_size   = 2
         try:
             frame_count = 0
             max_frames = 300
+            fps_clock = pygame.time.Clock()
             
             while frame_count < max_frames and any(c.alive for c in cars):
                 frame_count += 1
+                fps_clock.tick(Video.OUTPUT_FPS)
                 
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
@@ -576,9 +579,14 @@ min_species_size   = 2
         
         try:
             frame_count = 0
+            fps_clock = pygame.time.Clock()
+            fps_target = Video.OUTPUT_FPS
             
             while frame_count < max_frames and any(c.alive for c in cars):
                 frame_count += 1
+                
+                # Frame rate limiting
+                fps_clock.tick(fps_target)
                 
                 # Update weather
                 if self.flags.enable_weather:
@@ -704,19 +712,13 @@ min_species_size   = 2
                     if not car.alive and car.frames_since_gate > Fitness.MAX_FRAMES_STUCK:
                         genomes[i].fitness -= Fitness.STUCK_PENALTY
                 
-                # Handle collisions
-                valid_cars = [c for c in cars if c]
-                for car in valid_cars:
-                    if car.alive:
-                        car.handle_car_collision(valid_cars)
+                # Handle collisions (only between alive cars)
+                alive_cars_for_collision = [c for c in cars if c and c.alive]
+                for car in alive_cars_for_collision:
+                    car.handle_car_collision(alive_cars_for_collision)
                 
-                # Remove dead cars
-                for i in range(len(cars) - 1, -1, -1):
-                    if cars[i] and not cars[i].alive:
-                        cars.pop(i)
-                        nets.pop(i)
-                        genomes.pop(i)
-                        eval_data.pop(i)
+                # Mark dead cars for removal from active simulation
+                # (Don't remove from list to avoid index issues - just filter when iterating)
                 
                 # Render
                 should_render = should_record or frame_count % Video.RECORD_EVERY_N_FRAMES == 0

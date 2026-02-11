@@ -158,10 +158,12 @@ class GhostCar:
         
         # Visual
         self.color = (255, 255, 0, 128)  # Semi-transparent yellow
-        self.size = (40, 70)
+        self.size = (50, 85)
         
-        # Pre-render ghost surface
+        # Load ghost sprite (semi-transparent car)
         self._surface: pygame.Surface | None = None
+        self._sprite: pygame.Surface | None = None
+        self._load_sprite()
 
     def update(self) -> None:
         """Advance to next frame."""
@@ -192,25 +194,45 @@ class GhostCar:
             return
         
         draw_pos = camera.apply_point(pos)
+        angle = self.get_angle()
         
-        # Draw semi-transparent ghost
-        if self._surface is None:
-            self._create_surface()
-        
-        if self._surface:
-            rotated = pygame.transform.rotate(self._surface, -self.get_angle() - 90)
+        # Use car sprite if available, otherwise fallback to ellipse
+        if self._sprite:
+            rotated = pygame.transform.rotate(self._sprite, -angle - 90)
+            rect = rotated.get_rect(center=draw_pos)
+            screen.blit(rotated, rect.topleft)
+        elif self._surface:
+            rotated = pygame.transform.rotate(self._surface, -angle - 90)
             rect = rotated.get_rect(center=draw_pos)
             screen.blit(rotated, rect.topleft)
         else:
-            # Fallback
+            # Fallback circle
             pygame.draw.circle(screen, (255, 255, 0), draw_pos, 20)
 
+    def _load_sprite(self) -> None:
+        """Load and prepare ghost car sprite."""
+        try:
+            settings = get_settings()
+            assets_dir = settings.paths.assets_dir
+            sprite_path = assets_dir / "car_leader.png"
+            
+            if sprite_path.exists():
+                # Load the leader car sprite
+                sprite = pygame.image.load(str(sprite_path)).convert_alpha()
+                sprite = pygame.transform.scale(sprite, self.size)
+                
+                # Make it semi-transparent (ghost effect)
+                sprite.set_alpha(128)
+                self._sprite = sprite
+        except Exception:
+            self._sprite = None
+    
     def _create_surface(self) -> None:
-        """Create semi-transparent ghost surface."""
+        """Create fallback ghost surface if sprite not available."""
         try:
             surf = pygame.Surface(self.size, pygame.SRCALPHA)
             
-            # Ghost body - semi-transparent
+            # Ghost body - semi-transparent yellow
             body_color = (255, 255, 0, 100)
             pygame.draw.ellipse(surf, body_color, (5, 5, self.size[0]-10, self.size[1]-10))
             
