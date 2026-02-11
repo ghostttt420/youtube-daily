@@ -325,6 +325,15 @@ min_species_size   = 2
         def _setup():
             self.create_neat_config()
             
+            # Always load config first (needed for checkpoint validation)
+            self.config = neat.Config(
+                neat.DefaultGenome,
+                neat.DefaultReproduction,
+                neat.DefaultSpeciesSet,
+                neat.DefaultStagnation,
+                str(self.config_path),
+            )
+            
             checkpoint = self.find_latest_checkpoint()
             if checkpoint:
                 try:
@@ -338,26 +347,12 @@ min_species_size   = 2
                         )
                         # Delete the incompatible checkpoint
                         checkpoint.unlink()
-                        # Create fresh config and population
-                        self.config = neat.Config(
-                            neat.DefaultGenome,
-                            neat.DefaultReproduction,
-                            neat.DefaultSpeciesSet,
-                            neat.DefaultStagnation,
-                            str(self.config_path),
-                        )
+                        # Start fresh with existing config
                         self.run_dummy_generation()
                         self.population = self.create_population()
                     else:
                         raise
             else:
-                self.config = neat.Config(
-                    neat.DefaultGenome,
-                    neat.DefaultReproduction,
-                    neat.DefaultSpeciesSet,
-                    neat.DefaultStagnation,
-                    str(self.config_path),
-                )
                 self.run_dummy_generation()
                 self.population = self.create_population()
             
