@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import pickle
 import time
@@ -175,7 +176,7 @@ enabled_rate_to_true_add = 0.0
 enabled_rate_to_false_add = 0.0
 
 num_hidden              = 0
-num_inputs              = 7
+num_inputs              = 9
 num_outputs             = 2
 
 node_add_prob           = 0.1
@@ -214,16 +215,16 @@ min_species_size   = 2
         num_inputs = parser.getint("DefaultGenome", "num_inputs", fallback=0)
         num_outputs = parser.getint("DefaultGenome", "num_outputs", fallback=0)
         
-        if num_inputs != 7 or num_outputs != 2:
+        if num_inputs != 9 or num_outputs != 2:
             logger.error(
                 "config_mismatch",
-                expected_inputs=7,
+                expected_inputs=9,
                 actual_inputs=num_inputs,
                 expected_outputs=2,
                 actual_outputs=num_outputs,
             )
             raise ValueError(
-                f"NEAT config mismatch: expected 7 inputs and 2 outputs, "
+                f"NEAT config mismatch: expected 9 inputs and 2 outputs, "
                 f"got {num_inputs} inputs and {num_outputs} outputs"
             )
 
@@ -653,13 +654,36 @@ min_species_size   = 2
                         car.friction = weather_friction
                     
                     # Get AI inputs
+                    # 1. Radar distances (5 inputs)
                     radar_inputs = (
                         [d[1] / 300.0 for d in car.radars]
                         if len(car.radars) >= 5
                         else [0.0] * 5
                     )
+                    
+                    # 2. GPS to next checkpoint (2 inputs: heading, distance)
                     gps_inputs = car.get_data(self.checkpoints)
-                    inputs = radar_inputs + gps_inputs
+                    
+                    # 3. Speed input (1 input) - normalized to max speed
+                    speed_input = [car.velocity.length() / car.max_speed]
+                    
+                    # 4. Next-next checkpoint heading (1 input) - for look-ahead
+                    next_next_heading = [0.0]
+                    if self.checkpoints:
+                        next_next_idx = (car.next_gate_idx + 1) % len(self.checkpoints)
+                        next_next_pos = pygame.math.Vector2(self.checkpoints[next_next_idx])
+                        dx = next_next_pos.x - car.position.x
+                        dy = next_next_pos.y - car.position.y
+                        target_rad = math.atan2(dy, dx)
+                        car_rad = math.radians(car.angle)
+                        diff = target_rad - car_rad
+                        while diff > math.pi:
+                            diff -= 2 * math.pi
+                        while diff < -math.pi:
+                            diff += 2 * math.pi
+                        next_next_heading = [diff / math.pi]
+                    
+                    inputs = radar_inputs + gps_inputs + speed_input + next_next_heading
                     
                     # Activate network
                     output = nets[i].activate(inputs)

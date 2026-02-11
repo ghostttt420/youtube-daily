@@ -102,5 +102,5 @@ class NEAT:
     DEFAULT_POPULATION = 40
     DEFAULT_GENERATIONS = 50
     CHECKPOINT_INTERVAL = 5
-    INPUTS = 7  # 5 sensors + 2 GPS
+    INPUTS = 9  # 5 sensors + 2 GPS (current) + 1 speed + 1 GPS (next-next checkpoint)
     OUTPUTS = 2  # steering + gas (though gas is always on in current impl)
