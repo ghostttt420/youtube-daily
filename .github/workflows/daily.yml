@@ -86,6 +86,13 @@ jobs:
           git config --global user.name "Auto-Evolution Bot"
           git config --global user.email "bot@factghost.com"
           
+          # Reset any unstaged changes to avoid conflicts
+          git checkout -- . || true
+          git clean -fd || true
+          
+          # Pull latest changes first (before committing)
+          git pull --rebase --autostash origin ${{ github.ref_name }} || true
+          
           # Stage checkpoint and theme
           git add neat-checkpoint-* 2>/dev/null || true
           git add theme.json 2>/dev/null || true
@@ -93,7 +100,7 @@ jobs:
           # Commit if there are changes
           if ! git diff --staged --quiet; then
             git commit -m "🧠 Brain Evolution: Daily Update [skip ci]"
-            git pull --rebase origin ${{ github.ref_name }}
+            git pull --rebase --autostash origin ${{ github.ref_name }}
             git push
           else
             echo "No changes to commit"
