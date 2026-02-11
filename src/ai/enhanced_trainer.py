@@ -175,8 +175,8 @@ initial_connection      = full
 enabled_rate_to_true_add = 0.0
 enabled_rate_to_false_add = 0.0
 
-num_hidden              = 0
-num_inputs              = 9
+num_hidden              = 3
+num_inputs              = 11
 num_outputs             = 2
 
 node_add_prob           = 0.1
@@ -215,16 +215,16 @@ min_species_size   = 2
         num_inputs = parser.getint("DefaultGenome", "num_inputs", fallback=0)
         num_outputs = parser.getint("DefaultGenome", "num_outputs", fallback=0)
         
-        if num_inputs != 9 or num_outputs != 2:
+        if num_inputs != 11 or num_outputs != 2:
             logger.error(
                 "config_mismatch",
-                expected_inputs=9,
+                expected_inputs=11,
                 actual_inputs=num_inputs,
                 expected_outputs=2,
                 actual_outputs=num_outputs,
             )
             raise ValueError(
-                f"NEAT config mismatch: expected 9 inputs and 2 outputs, "
+                f"NEAT config mismatch: expected 11 inputs and 2 outputs, "
                 f"got {num_inputs} inputs and {num_outputs} outputs"
             )
 
@@ -707,11 +707,11 @@ min_species_size   = 2
                         car.friction = weather_friction
                     
                     # Get AI inputs
-                    # 1. Radar distances (5 inputs)
+                    # 1. Radar distances (11 inputs)
                     radar_inputs = (
                         [d[1] / 300.0 for d in car.radars]
-                        if len(car.radars) >= 5
-                        else [0.0] * 5
+                        if len(car.radars) >= 11
+                        else [0.0] * 11
                     )
                     
                     # 2. GPS to next checkpoint (2 inputs: heading, distance)
@@ -744,20 +744,28 @@ min_species_size   = 2
                     # Track steering for smoothness
                     prev_steering = car.steering
                     
-                    # Apply controls
-                    if output[0] > 0.5:
-                        car.input_steer(right=True)
-                    elif output[0] < -0.5:
-                        car.input_steer(left=True)
+                    # Apply controls - use full tanh range for steering
+                    # output[0] is steering: -1.0 (full left) to 1.0 (full right)
+                    car.steering = max(-1.0, min(1.0, output[0]))
                     
                     # Track steering changes
                     if car.steering != prev_steering:
                         data.steering_changes += 1
                     data.total_steering += abs(car.steering)
                     
-                    car.input_gas()
+                    # Gas/brake control using output[1]
+                    # output[1] > 0 = gas, output[1] <= 0 = brake/coast
+                    if output[1] > 0:
+                        car.input_gas()
+                    else:
+                        # Brake or coast - apply less acceleration
+                        car.acceleration = car.acceleration_rate * max(-0.5, output[1])
+                    
                     car.update(self.map_mask)
                     car.check_radar(self.map_mask)
+                    
+                    # Survival reward - small bonus for staying alive each frame
+                    genomes[i].fitness += 0.05
                     
                     # Update evaluation data
                     data.distance = car.distance_traveled
@@ -782,10 +790,10 @@ min_species_size   = 2
                     
                     # Multi-objective bonuses
                     if self.flags.enable_multi_objective:
-                        # Center bonus
-                        if len(car.radars) >= 5:
-                            left_dist = car.radars[0][1]
-                            right_dist = car.radars[4][1]
+                        # Center bonus - compare left (-60°) and right (60°) sensors
+                        if len(car.radars) >= 11:
+                            left_dist = car.radars[1][1]   # -60°
+                            right_dist = car.radars[9][1]  # +60°
                             center_ratio = 1.0 - abs(left_dist - right_dist) / 300.0
                             center_ratio = max(0, center_ratio)
                             genomes[i].fitness += center_ratio * 0.1

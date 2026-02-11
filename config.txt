@@ -63,8 +63,8 @@ weight_replace_rate     = 0.1
 # --- Network Architecture ---
 feed_forward            = True
 initial_connection      = full
-num_hidden              = 0
-num_inputs              = 9
+num_hidden              = 3
+num_inputs              = 11
 num_outputs             = 2
 
 # --- Compatibility ---

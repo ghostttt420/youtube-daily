@@ -16,7 +16,7 @@ class Physics:
 class Sensors:
     """Sensor configuration constants."""
     
-    RAY_ANGLES = [-60, -30, 0, 30, 60]
+    RAY_ANGLES = [-90, -60, -45, -30, -15, 0, 15, 30, 45, 60, 90]
     DEFAULT_LENGTH = 300
     RAY_STEP = 20
     CENTER_BONUS_WEIGHT = 0.1
@@ -102,5 +102,5 @@ class NEAT:
     DEFAULT_POPULATION = 40
     DEFAULT_GENERATIONS = 50
     CHECKPOINT_INTERVAL = 5
-    INPUTS = 9  # 5 sensors + 2 GPS (current) + 1 speed + 1 GPS (next-next checkpoint)
+    INPUTS = 11  # 11 sensors + 2 GPS (current) + 1 speed + 1 GPS (next-next checkpoint)
     OUTPUTS = 2  # steering + gas (though gas is always on in current impl)
