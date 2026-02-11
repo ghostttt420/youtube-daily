@@ -280,6 +280,9 @@ min_species_size   = 2
         self.start_pos, track_surface, visual_map, self.checkpoints, self.start_angle = \
             self.track_gen.generate_track(world_size)
         
+        # Store actual world size used for track (may differ from settings due to curriculum)
+        self.world_size = world_size
+        
         self.track_surface = track_surface
         self.visual_map = visual_map
         self.map_mask = pygame.mask.from_surface(track_surface)
@@ -352,7 +355,7 @@ min_species_size   = 2
         screen = pygame.display.set_mode(
             (self.settings.simulation.width, self.settings.simulation.height)
         )
-        camera = Camera(self.settings.simulation.world_size, self.settings.simulation.world_size)
+        camera = Camera(self.world_size, self.world_size)
         camera.set_viewport(self.settings.simulation.width, self.settings.simulation.height)
         
         cars = [Car(self.start_pos, self.start_angle) for _ in range(40)]
@@ -364,8 +367,8 @@ min_species_size   = 2
         # Initialize camera to center on starting position
         start_x = -self.start_pos[0] + self.settings.simulation.width / 2
         start_y = -self.start_pos[1] + self.settings.simulation.height / 2
-        start_x = min(0, max(-(self.settings.simulation.world_size - self.settings.simulation.width), start_x))
-        start_y = min(0, max(-(self.settings.simulation.world_size - self.settings.simulation.height), start_y))
+        start_x = min(0, max(-(self.world_size - self.settings.simulation.width), start_x))
+        start_y = min(0, max(-(self.world_size - self.settings.simulation.height), start_y))
         camera.exact_x = start_x
         camera.exact_y = start_y
         # Update camera rect to match
@@ -414,8 +417,8 @@ min_species_size   = 2
                 screen.fill(bg_color)
                 
                 # Draw visual map - clamp camera to ensure valid position
-                map_x = max(min(camera.camera.x, 0), -(self.settings.simulation.world_size - self.settings.simulation.width))
-                map_y = max(min(camera.camera.y, 0), -(self.settings.simulation.world_size - self.settings.simulation.height))
+                map_x = max(min(camera.camera.x, 0), -(self.world_size - self.settings.simulation.width))
+                map_y = max(min(camera.camera.y, 0), -(self.world_size - self.settings.simulation.height))
                 screen.blit(self.visual_map, (map_x, map_y))
                 
                 for car in cars:
@@ -548,7 +551,7 @@ min_species_size   = 2
         screen = pygame.display.set_mode(
             (self.settings.simulation.width, self.settings.simulation.height)
         )
-        camera = Camera(self.settings.simulation.world_size, self.settings.simulation.world_size)
+        camera = Camera(self.world_size, self.world_size)
         camera.set_viewport(self.settings.simulation.width, self.settings.simulation.height)
         
         # Load sprites for all cars (after pygame init)
@@ -560,8 +563,8 @@ min_species_size   = 2
             start_x = -cars[0].position.x + self.settings.simulation.width / 2
             start_y = -cars[0].position.y + self.settings.simulation.height / 2
             # Clamp to world bounds
-            start_x = min(0, max(-(self.settings.simulation.world_size - self.settings.simulation.width), start_x))
-            start_y = min(0, max(-(self.settings.simulation.world_size - self.settings.simulation.height), start_y))
+            start_x = min(0, max(-(self.world_size - self.settings.simulation.width), start_x))
+            start_y = min(0, max(-(self.world_size - self.settings.simulation.height), start_y))
             camera.exact_x = start_x
             camera.exact_y = start_y
             # Update camera rect to match
@@ -748,8 +751,8 @@ min_species_size   = 2
                     screen.fill(bg_color)
                     
                     # Draw visual map - clamp camera to ensure valid position
-                    map_x = max(min(camera.camera.x, 0), -(self.settings.simulation.world_size - self.settings.simulation.width))
-                    map_y = max(min(camera.camera.y, 0), -(self.settings.simulation.world_size - self.settings.simulation.height))
+                    map_x = max(min(camera.camera.x, 0), -(self.world_size - self.settings.simulation.width))
+                    map_y = max(min(camera.camera.y, 0), -(self.world_size - self.settings.simulation.height))
                     screen.blit(self.visual_map, (map_x, map_y))
                     
                     # Draw weather effects
