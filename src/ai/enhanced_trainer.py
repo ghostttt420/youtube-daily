@@ -409,9 +409,15 @@ min_species_size   = 2
                         car.update(self.map_mask)
                 
                 # Render
+                # Fill with theme background (in case visual_map doesn't cover viewport)
                 bg_color = self._get_bg_color()
                 screen.fill(bg_color)
-                screen.blit(self.visual_map, (camera.camera.x, camera.camera.y))
+                
+                # Draw visual map - clamp camera to ensure valid position
+                map_x = max(min(camera.camera.x, 0), -(self.settings.simulation.world_size - self.settings.simulation.width))
+                map_y = max(min(camera.camera.y, 0), -(self.settings.simulation.world_size - self.settings.simulation.height))
+                screen.blit(self.visual_map, (map_x, map_y))
+                
                 for car in cars:
                     car.draw(screen, camera)
                 
@@ -737,9 +743,14 @@ min_species_size   = 2
                 # Render
                 should_render = should_record or frame_count % Video.RECORD_EVERY_N_FRAMES == 0
                 if should_render:
+                    # Fill with theme background (in case visual_map doesn't cover viewport)
                     bg_color = self._get_bg_color()
                     screen.fill(bg_color)
-                    screen.blit(self.visual_map, (camera.camera.x, camera.camera.y))
+                    
+                    # Draw visual map - clamp camera to ensure valid position
+                    map_x = max(min(camera.camera.x, 0), -(self.settings.simulation.world_size - self.settings.simulation.width))
+                    map_y = max(min(camera.camera.y, 0), -(self.settings.simulation.world_size - self.settings.simulation.height))
+                    screen.blit(self.visual_map, (map_x, map_y))
                     
                     # Draw weather effects
                     if self.flags.enable_weather and self.weather.current:
