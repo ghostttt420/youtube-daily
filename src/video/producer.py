@@ -150,18 +150,20 @@ class VideoProducer:
         # Concatenate
         final_video = concatenate_videoclips(processed_clips, method="compose")
         
-        # Time adjustment - only speed up if we're over max, otherwise pad to target
+        # Time adjustment - only speed up if we're over max
         speed_ratio = 1.0
         if final_video.duration > Video.MAX_DURATION:
             speed_ratio = final_video.duration / Video.TARGET_DURATION
             logger.info("speeding_up_video", ratio=speed_ratio)
             final_video = final_video.fx(vfx.speedx, speed_ratio)
         elif final_video.duration < Video.TARGET_DURATION:
-            # Loop the video to reach target duration
-            logger.info("looping_video", current_duration=final_video.duration, target=Video.TARGET_DURATION)
-            loops_needed = int(Video.TARGET_DURATION / final_video.duration) + 1
-            final_video = concatenate_videoclips([final_video] * loops_needed, method="compose")
-            final_video = final_video.subclip(0, Video.TARGET_DURATION)
+            # Extend final clip instead of looping whole video
+            shortfall = Video.TARGET_DURATION - final_video.duration
+            logger.info("extending_final_clip", current_duration=final_video.duration, 
+                       target=Video.TARGET_DURATION, shortfall=shortfall)
+            # The last clip is already processed - we accept slightly shorter videos
+            # or could extend with a "watch full evolution" end card
+            pass  # Keep as-is, slightly shorter is better than repetitive
         
         # Add audio
         final_video = self._add_audio(final_video, speed_ratio)
@@ -217,16 +219,25 @@ class VideoProducer:
             is_last = index == total - 1
             
             # Calculate target duration for this clip
-            # Distribute time: first and last get more, middle get less
+            # Use more of the source content to avoid repetitive feel
+            # Target: 58s total, distributed by importance
             if is_first:
-                target_duration = min(12.0, target_total * 0.2)  # 20% or max 12s
+                # First clip: up to 15s of the beginning
+                target_duration = min(clip.duration, 15.0)
             elif is_last:
-                target_duration = min(20.0, target_total * 0.3)  # 30% or max 20s
+                # Last clip: use up to 25s (the exciting finale)
+                target_duration = min(clip.duration, 25.0)
             else:
-                # Distribute remaining time among middle clips
-                remaining = target_total - min(12.0, target_total * 0.2) - min(20.0, target_total * 0.3)
+                # Middle clips: distribute remaining time
+                # If we have many clips, use ~8s each
+                # If few clips, use more of each
                 middle_count = max(1, num_clips - 2)
-                target_duration = remaining / middle_count
+                if middle_count <= 2:
+                    target_duration = min(clip.duration, 18.0)  # Few clips = longer segments
+                elif middle_count <= 4:
+                    target_duration = min(clip.duration, 12.0)  # Medium count
+                else:
+                    target_duration = min(clip.duration, 8.0)   # Many clips = shorter segments
             
             if is_first:
                 clip_info = self._apply_first_clip_effects(clip, hook, gen_num, target_duration)
