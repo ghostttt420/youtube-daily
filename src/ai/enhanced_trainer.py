@@ -176,7 +176,7 @@ enabled_rate_to_true_add = 0.0
 enabled_rate_to_false_add = 0.0
 
 num_hidden              = 3
-num_inputs              = 11
+num_inputs              = 15
 num_outputs             = 2
 
 node_add_prob           = 0.1
@@ -215,16 +215,16 @@ min_species_size   = 2
         num_inputs = parser.getint("DefaultGenome", "num_inputs", fallback=0)
         num_outputs = parser.getint("DefaultGenome", "num_outputs", fallback=0)
         
-        if num_inputs != 11 or num_outputs != 2:
+        if num_inputs != 15 or num_outputs != 2:
             logger.error(
                 "config_mismatch",
-                expected_inputs=11,
+                expected_inputs=15,
                 actual_inputs=num_inputs,
                 expected_outputs=2,
                 actual_outputs=num_outputs,
             )
             raise ValueError(
-                f"NEAT config mismatch: expected 11 inputs and 2 outputs, "
+                f"NEAT config mismatch: expected 15 inputs and 2 outputs, "
                 f"got {num_inputs} inputs and {num_outputs} outputs"
             )
 
