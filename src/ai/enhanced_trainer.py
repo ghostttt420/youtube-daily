@@ -368,6 +368,13 @@ min_species_size   = 2
         start_y = min(0, max(-(self.settings.simulation.world_size - self.settings.simulation.height), start_y))
         camera.exact_x = start_x
         camera.exact_y = start_y
+        # Update camera rect to match
+        camera.camera = pygame.Rect(
+            int(camera.exact_x),
+            int(camera.exact_y),
+            camera._viewport_width,
+            camera._viewport_height,
+        )
         
         # Video setup
         video_path = self.settings.paths.clips_dir / "gen_00000.mp4"
@@ -551,6 +558,13 @@ min_species_size   = 2
             start_y = min(0, max(-(self.settings.simulation.world_size - self.settings.simulation.height), start_y))
             camera.exact_x = start_x
             camera.exact_y = start_y
+            # Update camera rect to match
+            camera.camera = pygame.Rect(
+                int(camera.exact_x),
+                int(camera.exact_y),
+                camera._viewport_width,
+                camera._viewport_height,
+            )
         
         # Determine recording
         is_first = self.generation == self.start_gen + 1

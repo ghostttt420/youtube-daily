@@ -63,15 +63,19 @@ class Camera:
         target_x = -target.position.x + self._viewport_width / 2
         target_y = -target.position.y + self._viewport_height / 2
         
-        # Clamp to world bounds
+        # Clamp target to world bounds
         target_x = min(0, max(-(self.width - self._viewport_width), target_x))
         target_y = min(0, max(-(self.height - self._viewport_height), target_y))
 
-        # Smooth interpolation with faster response (0.3 instead of 0.1)
-        # This reduces visible gaps at world edges while maintaining smoothness
+        # Smooth interpolation
         lerp_factor = 0.3
         self.exact_x += (target_x - self.exact_x) * lerp_factor
         self.exact_y += (target_y - self.exact_y) * lerp_factor
+        
+        # CRITICAL: Clamp actual position to bounds after interpolation
+        # This prevents the camera from showing empty space at world edges
+        self.exact_x = min(0, max(-(self.width - self._viewport_width), self.exact_x))
+        self.exact_y = min(0, max(-(self.height - self._viewport_height), self.exact_y))
         
         # Camera rect represents the viewport (what's visible on screen)
         self.camera = pygame.Rect(
