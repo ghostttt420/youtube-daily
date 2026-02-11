@@ -244,6 +244,37 @@ min_species_size   = 2
         
         try:
             population = neat.Checkpointer.restore_checkpoint(str(path))
+            
+            # Validate checkpoint compatibility with current config
+            # Check first genome's input/output count
+            if population.population:
+                first_genome = next(iter(population.population.values()))
+                # Get actual input/output size from config
+                expected_inputs = self.config.genome_config.num_inputs
+                expected_outputs = self.config.genome_config.num_outputs
+                
+                # Check by trying to create a network
+                try:
+                    test_net = neat.nn.FeedForwardNetwork.create(first_genome, self.config)
+                    # Try activating with expected inputs to validate
+                    test_inputs = [0.0] * expected_inputs
+                    test_net.activate(test_inputs)
+                except RuntimeError as e:
+                    if "inputs" in str(e).lower():
+                        logger.warning(
+                            "checkpoint_incompatible",
+                            path=str(path),
+                            error=str(e),
+                            expected_inputs=expected_inputs,
+                            expected_outputs=expected_outputs,
+                        )
+                        raise ValueError(
+                            f"Checkpoint incompatible: {e}. "
+                            f"Expected {expected_inputs} inputs, {expected_outputs} outputs. "
+                            f"Delete old checkpoints to start fresh."
+                        )
+                    raise
+            
             return population
         except (pickle.PickleError, EOFError) as e:
             logger.error("checkpoint_corrupted", error=str(e))
@@ -296,7 +327,29 @@ min_species_size   = 2
             
             checkpoint = self.find_latest_checkpoint()
             if checkpoint:
-                self.population = self.load_checkpoint(checkpoint)
+                try:
+                    self.population = self.load_checkpoint(checkpoint)
+                except ValueError as e:
+                    if "incompatible" in str(e).lower():
+                        logger.warning(
+                            "checkpoint_incompatible_starting_fresh",
+                            checkpoint=str(checkpoint),
+                            error=str(e),
+                        )
+                        # Delete the incompatible checkpoint
+                        checkpoint.unlink()
+                        # Create fresh config and population
+                        self.config = neat.Config(
+                            neat.DefaultGenome,
+                            neat.DefaultReproduction,
+                            neat.DefaultSpeciesSet,
+                            neat.DefaultStagnation,
+                            str(self.config_path),
+                        )
+                        self.run_dummy_generation()
+                        self.population = self.create_population()
+                    else:
+                        raise
             else:
                 self.config = neat.Config(
                     neat.DefaultGenome,
