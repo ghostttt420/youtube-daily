@@ -125,14 +125,19 @@ class VideoProducer:
         final_gen = self.extract_generation(clips[-1])
         logger.info("producing_video", clip_count=len(clips), final_gen=final_gen)
         
-        # Process each clip
+        # Calculate target duration per clip to hit ~58s total
+        # Allow buffer for intro/outro text overlays
+        target_total = Video.TARGET_DURATION  # 58s
+        num_clips = len(clips)
+        
+        # Process each clip with dynamic duration based on total target
         processed_clips = []
         chosen_hook = random.choice(HOOKS)
         engine_volumes = []
         
         for i, clip_path in enumerate(clips):
             processed = self._process_clip(
-                clip_path, i, len(clips), chosen_hook
+                clip_path, i, len(clips), chosen_hook, target_total, num_clips
             )
             if processed:
                 processed_clips.append(processed["clip"])
@@ -145,12 +150,18 @@ class VideoProducer:
         # Concatenate
         final_video = concatenate_videoclips(processed_clips, method="compose")
         
-        # Time adjustment
+        # Time adjustment - only speed up if we're over max, otherwise pad to target
         speed_ratio = 1.0
         if final_video.duration > Video.MAX_DURATION:
             speed_ratio = final_video.duration / Video.TARGET_DURATION
             logger.info("speeding_up_video", ratio=speed_ratio)
             final_video = final_video.fx(vfx.speedx, speed_ratio)
+        elif final_video.duration < Video.TARGET_DURATION:
+            # Loop the video to reach target duration
+            logger.info("looping_video", current_duration=final_video.duration, target=Video.TARGET_DURATION)
+            loops_needed = int(Video.TARGET_DURATION / final_video.duration) + 1
+            final_video = concatenate_videoclips([final_video] * loops_needed, method="compose")
+            final_video = final_video.subclip(0, Video.TARGET_DURATION)
         
         # Add audio
         final_video = self._add_audio(final_video, speed_ratio)
@@ -180,6 +191,8 @@ class VideoProducer:
         index: int,
         total: int,
         hook: str,
+        target_total: float = 58.0,
+        num_clips: int = 1,
     ) -> dict | None:
         """Process a single clip.
         
@@ -203,15 +216,24 @@ class VideoProducer:
             is_first = index == 0
             is_last = index == total - 1
             
+            # Calculate target duration for this clip
+            # Distribute time: first and last get more, middle get less
             if is_first:
-                # First clip - show hook
-                clip_info = self._apply_first_clip_effects(clip, hook, gen_num)
+                target_duration = min(12.0, target_total * 0.2)  # 20% or max 12s
             elif is_last:
-                # Last clip - show final form
-                clip_info = self._apply_last_clip_effects(clip, gen_num)
+                target_duration = min(20.0, target_total * 0.3)  # 30% or max 20s
             else:
-                # Middle clip
-                clip_info = self._apply_middle_clip_effects(clip, gen_num)
+                # Distribute remaining time among middle clips
+                remaining = target_total - min(12.0, target_total * 0.2) - min(20.0, target_total * 0.3)
+                middle_count = max(1, num_clips - 2)
+                target_duration = remaining / middle_count
+            
+            if is_first:
+                clip_info = self._apply_first_clip_effects(clip, hook, gen_num, target_duration)
+            elif is_last:
+                clip_info = self._apply_last_clip_effects(clip, gen_num, target_duration)
+            else:
+                clip_info = self._apply_middle_clip_effects(clip, gen_num, target_duration)
             
             return clip_info
             
@@ -224,6 +246,7 @@ class VideoProducer:
         clip: VideoFileClip,
         hook: str,
         gen_num: int,
+        target_duration: float = 10.0,
     ) -> dict:
         """Apply effects to first clip.
         
@@ -231,13 +254,15 @@ class VideoProducer:
             clip: Input clip
             hook: Hook text
             gen_num: Generation number
+            target_duration: Target duration in seconds
             
         Returns:
             Clip info dict
         """
-        # Shorten first clip
-        if clip.duration > 4:
-            clip = clip.subclip(0, 4)
+        # Use target duration, but don't exceed clip length
+        use_duration = min(clip.duration, target_duration)
+        if clip.duration > use_duration:
+            clip = clip.subclip(0, use_duration)
         
         try:
             # Big hook text
@@ -272,16 +297,26 @@ class VideoProducer:
             "engine_vol": 0.3,
         }
 
-    def _apply_last_clip_effects(self, clip: VideoFileClip, gen_num: int) -> dict:
+    def _apply_last_clip_effects(
+        self, 
+        clip: VideoFileClip, 
+        gen_num: int,
+        target_duration: float = 15.0,
+    ) -> dict:
         """Apply effects to last clip.
         
         Args:
             clip: Input clip
             gen_num: Generation number
+            target_duration: Target duration in seconds
             
         Returns:
             Clip info dict
         """
+        # Use target duration, but don't exceed clip length
+        use_duration = min(clip.duration, target_duration)
+        if clip.duration > use_duration:
+            clip = clip.subclip(0, use_duration)
         try:
             txt = TextClip(
                 f"Gen {gen_num}: EVOLUTION 🏁",
@@ -302,19 +337,26 @@ class VideoProducer:
             "engine_vol": 0.8,
         }
 
-    def _apply_middle_clip_effects(self, clip: VideoFileClip, gen_num: int) -> dict:
+    def _apply_middle_clip_effects(
+        self, 
+        clip: VideoFileClip, 
+        gen_num: int,
+        target_duration: float = 8.0,
+    ) -> dict:
         """Apply effects to middle clip.
         
         Args:
             clip: Input clip
             gen_num: Generation number
+            target_duration: Target duration in seconds
             
         Returns:
             Clip info dict
         """
-        # Shorten middle clips
-        if clip.duration > 3:
-            clip = clip.subclip(0, 3)
+        # Use target duration, but don't exceed clip length
+        use_duration = min(clip.duration, target_duration)
+        if clip.duration > use_duration:
+            clip = clip.subclip(0, use_duration)
         
         try:
             txt = TextClip(

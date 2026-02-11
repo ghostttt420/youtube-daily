@@ -35,7 +35,7 @@ class SimulationConfig(BaseSettings):
     world_size: int = Field(default=4000, ge=1000, description="World size in pixels")
     sensor_length: int = Field(default=300, ge=100, description="Sensor ray length")
     max_frames_training: int = Field(
-        default=450, ge=100, description="Max frames for training clips (15s at 30fps)"
+        default=1800, ge=100, description="Max frames for training clips (60s at 30fps)"
     )
     max_frames_pro: int = Field(
         default=1800, ge=300, description="Max frames for final render (60s at 30fps)"
