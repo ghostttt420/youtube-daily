@@ -189,7 +189,7 @@ single_structural_mutation = False
 structural_mutation_surer  = default
 
 [DefaultSpeciesSet]
-compatibility_threshold = 3.0
+compatibility_threshold = 5.0
 
 [DefaultStagnation]
 species_fitness_func = max
