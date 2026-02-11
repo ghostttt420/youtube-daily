@@ -99,7 +99,7 @@ class YouTube:
 class NEAT:
     """NEAT algorithm constants."""
     
-    DEFAULT_POPULATION = 40
+    DEFAULT_POPULATION = 60
     DEFAULT_GENERATIONS = 50
     CHECKPOINT_INTERVAL = 5
     INPUTS = 15  # 11 sensors + 2 GPS (current) + 1 speed + 1 GPS (next-next checkpoint)

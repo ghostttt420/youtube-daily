@@ -126,7 +126,7 @@ class EnhancedEvolutionTrainer:
 [NEAT]
 fitness_criterion     = max
 fitness_threshold     = 100000
-pop_size              = 40
+pop_size              = 60
 reset_on_extinction   = False
 no_fitness_termination = False
 
