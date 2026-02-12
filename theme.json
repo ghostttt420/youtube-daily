@@ -1,38 +1,38 @@
 {
-    "theme_key": "MIDNIGHT",
-    "map_seed": 173634,
+    "theme_key": "CYBER",
+    "map_seed": 527146,
     "physics": {
-        "friction": 0.965
+        "friction": 0.98
     },
     "visuals": {
         "bg": [
-            10,
-            10,
-            10
+            5,
+            0,
+            15
         ],
         "road": [
-            40,
-            40,
-            40
+            20,
+            20,
+            35
         ],
         "wall": [
+            0,
             255,
-            215,
-            0
+            255
         ],
         "center": [
             255,
-            255,
+            0,
             255
         ]
     },
     "meta": {
-        "title": "AI Tokyo Drift Run \ud83c\uddef\ud83c\uddf5 (Gen {gen})",
+        "title": "AI Street Racing at NIGHT \ud83c\udf03 (Gen {gen})",
         "tags": [
-            "jdm",
-            "tokyo",
+            "cyberpunk",
+            "neon",
             "drift",
-            "japan"
+            "night"
         ]
     }
 }
