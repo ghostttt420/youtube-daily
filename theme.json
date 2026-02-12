@@ -1,38 +1,38 @@
 {
-    "theme_key": "LAVA",
-    "map_seed": 910684,
+    "theme_key": "MIDNIGHT",
+    "map_seed": 173634,
     "physics": {
-        "friction": 0.94
+        "friction": 0.965
     },
     "visuals": {
         "bg": [
-            40,
-            5,
-            5
+            10,
+            10,
+            10
         ],
         "road": [
-            80,
-            20,
-            20
+            40,
+            40,
+            40
         ],
         "wall": [
             255,
-            80,
+            215,
             0
         ],
         "center": [
             255,
             255,
-            0
+            255
         ]
     },
     "meta": {
-        "title": "AI Races on LAVA \ud83d\udd25 (Gen {gen})",
+        "title": "AI Tokyo Drift Run \ud83c\uddef\ud83c\uddf5 (Gen {gen})",
         "tags": [
-            "lava",
-            "hot",
-            "danger",
-            "volcano"
+            "jdm",
+            "tokyo",
+            "drift",
+            "japan"
         ]
     }
 }
