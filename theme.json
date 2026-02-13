@@ -1,38 +1,37 @@
 {
-    "theme_key": "LAVA",
-    "map_seed": 673395,
+    "theme_key": "CIRCUIT",
+    "map_seed": 465134,
     "physics": {
-        "friction": 0.94
+        "friction": 0.97
     },
     "visuals": {
         "bg": [
-            40,
-            5,
-            5
+            30,
+            35,
+            30
         ],
         "road": [
-            80,
-            20,
-            20
+            50,
+            50,
+            55
         ],
         "wall": [
-            255,
-            80,
+            200,
+            0,
             0
         ],
         "center": [
             255,
             255,
-            0
+            255
         ]
     },
     "meta": {
-        "title": "AI Races on LAVA \ud83d\udd25 (Gen {gen})",
+        "title": "AI Learns to Race F1 Style \ud83c\udfce\ufe0f (Gen {gen})",
         "tags": [
-            "lava",
-            "hot",
-            "danger",
-            "volcano"
+            "f1",
+            "racing",
+            "motorsport"
         ]
     }
 }
