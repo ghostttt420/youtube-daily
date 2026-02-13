@@ -1,38 +1,38 @@
 {
-    "theme_key": "CYBER",
-    "map_seed": 687043,
+    "theme_key": "LAVA",
+    "map_seed": 673395,
     "physics": {
-        "friction": 0.98
+        "friction": 0.94
     },
     "visuals": {
         "bg": [
+            40,
             5,
-            0,
-            15
+            5
         ],
         "road": [
+            80,
             20,
-            20,
-            35
+            20
         ],
         "wall": [
-            0,
             255,
-            255
+            80,
+            0
         ],
         "center": [
             255,
-            0,
-            255
+            255,
+            0
         ]
     },
     "meta": {
-        "title": "AI Street Racing at NIGHT \ud83c\udf03 (Gen {gen})",
+        "title": "AI Races on LAVA \ud83d\udd25 (Gen {gen})",
         "tags": [
-            "cyberpunk",
-            "neon",
-            "drift",
-            "night"
+            "lava",
+            "hot",
+            "danger",
+            "volcano"
         ]
     }
 }
